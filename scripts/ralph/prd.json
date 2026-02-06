@@ -1,0 +1,174 @@
+{
+  "project": "dotenv-tui",
+  "branchName": "ralph/dotenv-tui",
+  "description": "A Go TUI tool that auto-generates .env.example from .env with smart secret detection, and generates .env from .env.example via an interactive editable form. Supports monorepo scanning.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Project scaffolding and Go module setup",
+      "description": "As a developer, I need the Go project structure initialized with dependencies so subsequent stories can build on it.",
+      "acceptanceCriteria": [
+        "go.mod initialized with module name (e.g., github.com/user/dotenv-tui)",
+        "main.go entry point exists with a minimal Bubble Tea program that shows 'dotenv-tui' and quits on q/Ctrl+C",
+        "Directory structure created: internal/parser/, internal/scanner/, internal/detector/, internal/tui/, internal/generator/",
+        "Dependencies added: charmbracelet/bubbletea, charmbracelet/lipgloss, charmbracelet/bubbles",
+        "go build succeeds"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": ".env file parser with comment and structure preservation",
+      "description": "As a developer, I need a parser that reads .env files and preserves comments, blank lines, and key ordering so generated files maintain the original structure.",
+      "acceptanceCriteria": [
+        "internal/parser/parser.go implements Parse(reader io.Reader) returning ordered list of entries",
+        "Each entry is one of: KeyValue (key, value, quoted style), Comment (text), BlankLine",
+        "Supports KEY=VALUE, KEY=\"VALUE\", KEY='VALUE', and export KEY=VALUE formats",
+        "Write(writer io.Writer, entries []Entry) reproduces the original file structure",
+        "Unit tests in internal/parser/parser_test.go cover all formats, comments, blank lines, and round-trip",
+        "go build succeeds",
+        "go test ./internal/parser/ passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Directory scanner for .env file discovery",
+      "description": "As a developer, I need a scanner that recursively finds .env files in a project tree, skipping dependency directories.",
+      "acceptanceCriteria": [
+        "internal/scanner/scanner.go implements Scan(root string) returning list of .env file paths (relative to root)",
+        "Finds files named .env, .env.local, .env.production, .env.development, and all .env.* variants, but excludes .env.example and .env.*.example",
+        "Skips directories: node_modules, .git, vendor, dist, build, .next, .nuxt, __pycache__",
+        "Unit tests in internal/scanner/scanner_test.go using a temp directory structure",
+        "go build succeeds",
+        "go test ./internal/scanner/ passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Secret detection heuristics",
+      "description": "As a developer, I need a detector that identifies secret-like environment variables by key name patterns and value patterns.",
+      "acceptanceCriteria": [
+        "internal/detector/detector.go implements IsSecret(key string, value string) bool",
+        "Detects secret-like keys containing: SECRET, KEY, TOKEN, PASSWORD, PASS, AUTH, CREDENTIAL, PRIVATE, API_KEY, ACCESS_KEY (case-insensitive)",
+        "Detects secret-like values: base64 strings longer than 20 chars, JWT tokens starting with eyJ, URLs with ://user:pass@ pattern, hex strings longer than 32 chars",
+        "Returns false for common non-secrets like PORT, HOST, NODE_ENV, APP_NAME, DEBUG, LOG_LEVEL",
+        "GeneratePlaceholder(key string, value string) returns a format-hint placeholder preserving the value prefix (e.g., sk_*** for sk_live_abc123, ghp_*** for ghp_xxxx, eyJ*** for JWTs, https://*** for URLs). Falls back to *** for unrecognized patterns",
+        "Unit tests in internal/detector/detector_test.go with table-driven tests covering all patterns",
+        "go build succeeds",
+        "go test ./internal/detector/ passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Generator logic for .env.example and .env",
+      "description": "As a developer, I need generator functions that produce .env.example from .env (masking secrets) and .env from .env.example (copying with placeholders).",
+      "acceptanceCriteria": [
+        "internal/generator/generator.go implements GenerateExample(entries []Entry) []Entry that replaces secret values with placeholders",
+        "internal/generator/generator.go implements GenerateEnv(entries []Entry) []Entry that copies entries as-is (for non-interactive mode)",
+        "Non-secret values are preserved as-is (e.g., PORT=3000 stays PORT=3000)",
+        "Secret values are replaced using detector.GeneratePlaceholder() which produces format-hint placeholders like sk_***, ghp_***, eyJ***",
+        "Comments and blank lines are preserved in output",
+        "Unit tests in internal/generator/generator_test.go",
+        "go build succeeds",
+        "go test ./internal/generator/ passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "TUI main menu with mode selection",
+      "description": "As a developer, I want a main menu to choose between generating .env.example or .env so the tool is easy to navigate.",
+      "acceptanceCriteria": [
+        "internal/tui/menu.go implements a Bubble Tea model with two options: 'Generate .env.example from .env' and 'Generate .env from .env.example'",
+        "Arrow key navigation highlights the selected option",
+        "Enter selects the option and transitions to the next screen (file picker placeholder for now)",
+        "q or Ctrl+C quits cleanly with alternate screen buffer restored",
+        "Styled with Lip Gloss: title, highlighted selection, help text at bottom",
+        "main.go launches this menu as the root model",
+        "go build succeeds"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "TUI file picker with scan results",
+      "description": "As a developer, I want to see discovered .env files in a selectable list so I can choose which files to process.",
+      "acceptanceCriteria": [
+        "internal/tui/picker.go implements a Bubble Tea model showing scanned .env files as a checklist",
+        "Each item shows relative path with a checkbox (toggled with space)",
+        "Arrow keys navigate the list, Enter confirms selection",
+        "Integrates scanner.Scan() to populate the list on init",
+        "Transitions from main menu when user selects a mode",
+        "go build succeeds"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "TUI diff preview for .env.example generation",
+      "description": "As a developer, I want to see a colored diff preview of what will change before writing .env.example so I can confirm the output.",
+      "acceptanceCriteria": [
+        "internal/tui/preview.go implements a Bubble Tea model showing a scrollable diff view",
+        "Kept values shown in green, masked/changed values shown in yellow with old → new format",
+        "User can confirm with Enter to write the file or press Esc to cancel",
+        "After confirmation, writes .env.example using parser.Write()",
+        "Shows success message with output file path",
+        "go build succeeds"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "TUI editable form for .env generation from .env.example",
+      "description": "As a developer, I want an interactive form pre-filled with example values so I can fill in my actual .env values.",
+      "acceptanceCriteria": [
+        "internal/tui/form.go implements a Bubble Tea model with a scrollable list of text inputs",
+        "Each variable shows label (key name) and editable text input using bubbles textinput component",
+        "Pre-filled with example values; placeholder values (containing 'your_' or '_here') shown as empty with hint text",
+        "Tab/arrow keys navigate between fields",
+        "Enter on last field or Ctrl+S submits the form",
+        "Confirmation prompt if .env already exists before overwriting",
+        "Writes .env using parser.Write() preserving comments and structure",
+        "go build succeeds"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "CLI flags for non-interactive use",
+      "description": "As a developer, I want CLI flags to run the tool non-interactively for scripting and CI use cases.",
+      "acceptanceCriteria": [
+        "main.go supports --generate-example <path> flag that generates .env.example from the specified .env file and exits",
+        "main.go supports --generate-env <path> flag that copies .env.example to .env (without form) and exits",
+        "main.go supports --scan flag that lists discovered .env files to stdout and exits",
+        "main.go supports --help flag that shows usage information",
+        "When no flags provided, launches the TUI as before",
+        "go build succeeds"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
