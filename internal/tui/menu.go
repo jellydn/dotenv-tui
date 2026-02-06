@@ -5,25 +5,25 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type menuChoice int
+type MenuChoice int
 
 const (
-	generateExample menuChoice = iota
-	generateEnv
+	GenerateExample MenuChoice = iota
+	GenerateEnv
 )
 
 type MenuModel struct {
-	choice menuChoice
+	choice MenuChoice
 }
 
 func NewMenuModel() MenuModel {
 	return MenuModel{
-		choice: generateExample,
+		choice: GenerateExample,
 	}
 }
 
 // Choice returns the current menu choice
-func (m MenuModel) Choice() menuChoice {
+func (m MenuModel) Choice() MenuChoice {
 	return m.choice
 }
 
@@ -36,18 +36,18 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
-			if m.choice > generateExample {
+			if m.choice > GenerateExample {
 				m.choice--
 			}
 		case "down", "j":
-			if m.choice < generateEnv {
+			if m.choice < GenerateEnv {
 				m.choice++
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter", " ":
-			// Transition to file picker
-			return m, NewPickerModel(m.choice, ".")
+			// Let main handle the screen transition
+			return m, nil
 		}
 	}
 	return m, nil
@@ -69,12 +69,12 @@ func (m MenuModel) View() string {
 	var renderedChoices string
 	for i, choice := range choices {
 		cursor := " "
-		if menuChoice(i) == m.choice {
+		if MenuChoice(i) == m.choice {
 			cursor = ">"
 			renderedChoices += lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#7D56F4")).
 				Bold(true).
-				Render(cursor + " " + choice + "\n")
+				Render(cursor+" "+choice) + "\n"
 		} else {
 			renderedChoices += cursor + " " + choice + "\n"
 		}

@@ -11,16 +11,16 @@ type PickerModel struct {
 	files    []string
 	selected map[int]bool
 	cursor   int
-	mode     menuChoice
+	mode     MenuChoice
 	rootDir  string
 }
 
 type PickerFinishedMsg struct {
 	Selected []string
-	Mode     menuChoice
+	Mode     MenuChoice
 }
 
-func NewPickerModel(mode menuChoice, rootDir string) tea.Cmd {
+func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
 	files, err := scanner.Scan(rootDir)
 	if err != nil {
 		// Return empty list if scan fails - we could handle this better in a real app
@@ -45,7 +45,7 @@ func NewPickerModel(mode menuChoice, rootDir string) tea.Cmd {
 type pickerInitMsg struct {
 	files    []string
 	selected map[int]bool
-	mode     menuChoice
+	mode     MenuChoice
 	rootDir  string
 }
 
@@ -91,8 +91,8 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "q", "esc":
-			// Return to menu
-			return NewMenuModel(), nil
+			// Let main handle the screen transition
+			return m, nil
 		}
 	}
 	return m, nil
