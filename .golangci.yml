@@ -1,0 +1,42 @@
+run:
+  timeout: 5m
+  go: "1.25"
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocritic
+    - gofmt
+    - goimports
+    - misspell
+    - revive
+    - unconvert
+    - unparam
+
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: dotenv-tui
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - disableStutteringCheck
+
+issues:
+  exclude-use-default: false
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+    - text: "weak cryptographic primitive"
+      linters:
+        - gosec
+  max-issues-per-linter: 0
+  max-same-issues: 0

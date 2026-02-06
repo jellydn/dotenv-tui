@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GO_VERSION: "1.25.6"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      tag_name: ${{ steps.get_tag.outputs.tag_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag name
+        id: get_tag
+        run: echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo HEAD)..HEAD >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.get_tag.outputs.tag_name }}
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: ${{ contains(steps.get_tag.outputs.tag_name, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-binaries:
+    name: Build Binaries
+    needs: release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary_name: dotenv-tui-linux-amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary_name: dotenv-tui-linux-arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            binary_name: dotenv-tui-darwin-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            binary_name: dotenv-tui-darwin-arm64
+          - os: ubuntu-latest
+            goos: windows
+            goarch: amd64
+            binary_name: dotenv-tui-windows-amd64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build -v -ldflags="-s -w -X main.version=${{ needs.release.outputs.tag_name }}" -o ${{ matrix.binary_name }} .
+
+      - name: Calculate checksum
+        run: |
+          if [[ "${{ matrix.goos }}" == "windows" ]]; then
+            sha256sum ${{ matrix.binary_name }} > ${{ matrix.binary_name }}.sha256
+          else
+            sha256sum ${{ matrix.binary_name }} > ${{ matrix.binary_name }}.sha256
+          fi
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.binary_name }}
+            ${{ matrix.binary_name }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  verify-release:
+    name: Verify Release
+    needs: [release, build-binaries]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release complete
+        run: |
+          echo "Release ${{ needs.release.outputs.tag_name }} has been created successfully!"
+          echo "Binaries built for:"
+          echo "  - Linux (amd64, arm64)"
+          echo "  - macOS (amd64, arm64)"
+          echo "  - Windows (amd64)"
