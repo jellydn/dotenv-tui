@@ -31,11 +31,20 @@ just test
 # Run tests with verbose output
 just test-v
 
-# Run a single test (example)
+# Run a single test function
+# Pattern: go test -v -run TestFunctionName ./package/path
 go test -v -run TestParse ./internal/parser
+go test -v -run TestIsSecret ./internal/detector
 
-# Run tests for specific package
+# Run tests for a specific package
 go test -v ./internal/parser
+go test -v ./internal/detector
+go test -v ./internal/generator
+go test -v ./internal/scanner
+go test -v ./internal/tui
+
+# Run with race detection and coverage
+go test -v -race -coverprofile=coverage.out ./...
 ```
 
 ## Lint/Format Commands
@@ -52,9 +61,9 @@ just fmt
 
 ### Imports
 
-- Group imports: standard library, then third-party
+- Group imports: standard library, then third-party, then local packages
 - Use `goimports` for automatic import management
-- No blank lines between import groups (gofmt standard)
+- Local imports use module prefix: `dotenv-tui/internal/parser`
 
 ```go
 import (
@@ -64,6 +73,9 @@ import (
     "strings"
 
     tea "github.com/charmbracelet/bubbletea"
+    "github.com/charmbracelet/lipgloss"
+
+    "dotenv-tui/internal/parser"
 )
 ```
 
@@ -71,8 +83,8 @@ import (
 
 - Use `gofmt` for all formatting
 - Use `goimports` for import organization
-- Max line length: follow Go conventions (no strict limit)
 - Indentation: tabs (Go standard)
+- Max line length: follow Go conventions
 
 ### Naming Conventions
 
@@ -140,15 +152,31 @@ type Entry interface {
 ├── go.sum               # Go module checksums
 ├── justfile             # Task definitions
 ├── internal/            # Internal packages
-│   └── parser/          # .env file parser
-│       ├── parser.go
-│       └── parser_test.go
+│   ├── parser/          # .env file parser
+│   │   ├── parser.go
+│   │   └── parser_test.go
+│   ├── detector/        # Secret detection logic
+│   │   ├── detector.go
+│   │   └── detector_test.go
+│   ├── generator/       # .env.example generation
+│   │   ├── generator.go
+│   │   └── generator_test.go
+│   ├── scanner/         # Directory scanning
+│   │   ├── scanner.go
+│   │   └── scanner_test.go
+│   └── tui/             # Bubble Tea TUI components
+│       ├── menu.go
+│       ├── picker.go
+│       ├── preview.go
+│       ├── form.go
+│       └── *_test.go
 └── scripts/             # Development scripts
 ```
 
 ## Dependencies
 
 - **Bubble Tea**: TUI framework (github.com/charmbracelet/bubbletea)
+- **Bubbles**: Bubble Tea components (github.com/charmbracelet/bubbles)
 - **Lip Gloss**: Styling (github.com/charmbracelet/lipgloss)
 - Standard Go library for file I/O
 
@@ -159,19 +187,11 @@ type Entry interface {
 - `golangci-lint` (linting)
 - `goimports` (import formatting)
 
-## Code Package Patterns
-
-### Generator Package (`internal/generator/`)
-
-- Uses type switching to handle different `Entry` types from parser
-- `GenerateExample()` leverages `detector.IsSecret()` and `detector.GeneratePlaceholder()` for secret masking
-- `GenerateEnv()` performs simple copy using `append()` with slice copying for non-interactive mode
-- Placeholders preserve format hints (prefix patterns) to maintain context for users
-- Quoted values are unquoted when replaced with placeholders for consistency
-
 ## Notes
 
 - Preserve comments and blank lines when parsing .env files
 - Maintain key ordering from original files
 - The parser uses an `Entry` interface for different line types (KeyValue, Comment, BlankLine)
 - This is a Bubble Tea TUI application - follow the Model-Update-View architecture
+- The detector uses pattern matching to identify secrets in key-value pairs
+- Placeholders preserve format hints (prefix patterns) for context
