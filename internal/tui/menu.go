@@ -54,12 +54,10 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m MenuModel) View() string {
-	title := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#FAFAFA")).
-		Background(lipgloss.Color("#7D56F4")).
-		Padding(0, 1).
-		Render("dotenv-tui")
+	logo := Logo()
+	wordmark := Wordmark()
+
+	header := lipgloss.JoinHorizontal(lipgloss.Top, logo, "  "+wordmark)
 
 	choices := []string{
 		"Generate .env.example from .env",
@@ -84,5 +82,5 @@ func (m MenuModel) View() string {
 		Faint(true).
 		Render("↑/k: up • ↓/j: down • Enter: select • q: quit")
 
-	return "\n" + title + "\n\n" + renderedChoices + "\n" + help + "\n"
+	return "\n" + header + "\n\n" + renderedChoices + "\n" + help + "\n"
 }
