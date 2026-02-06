@@ -111,3 +111,23 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Scanner integration is straightforward - just call Scan() in picker initialization
   - Default selection behavior (select all files) provides good UX for file pickers
 ---
+
+## [2026-02-07 01:56] - US-008
+[Session: https://opncd.ai/s/placeholder]
+- Implemented TUI diff preview for .env.example generation with colored diff view
+- Created preview.go with scrollable diff showing kept values (green) and masked/changed values (yellow)
+- Added file reading, parsing, and diff generation with old → new format display
+- Implemented confirmation flow with Enter to write file or Esc to cancel
+- Added success message display with output file path after writing
+- Updated main.go to handle preview screen transitions from picker
+- Exported MenuChoice type and constants from menu.go for cross-package access
+- Files changed: internal/tui/preview.go, internal/tui/menu.go, internal/tui/picker.go, main.go, scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - Export types when they need to be accessed from other packages (MenuChoice, PickerFinishedMsg)
+  - Use defer func() { _ = file.Close() }() to avoid staticcheck SA9003 empty branch errors
+  - Diff generation works by comparing string representations of original vs generated entries
+  - Color coding: green for unchanged, red for removed, green for added (following git diff conventions)
+  - Screen management requires adding new enum values and updating all switch statements
+  - Bubble Tea message types should be exported for cross-package communication
+  - File I/O operations should handle errors gracefully in TUI context
+---
