@@ -1,5 +1,9 @@
 # dotenv-tui
 
+<p align="center">
+  <img src="assets/logo.svg" alt="dotenv-tui logo" width="640" />
+</p>
+
 A terminal UI tool for managing `.env` files across projects and monorepos.
 
 ## Motivation

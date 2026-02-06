@@ -44,3 +44,35 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Table-driven tests with subtests work well for scanner validation with temp directories
   - Map lookup is faster for checking skipped directory names
 ---
+
+## [2026-02-07 00:38] - US-004
+[Session: https://opncd.ai/s/placeholder]
+- Implemented secret detection heuristics with comprehensive pattern matching
+- IsSecret() function checks key patterns, value patterns, and common non-secrets
+- GeneratePlaceholder() creates format-hint placeholders preserving value prefixes
+- Comprehensive unit tests covering all acceptance criteria with table-driven tests
+- Files changed: internal/detector/detector.go, internal/detector/detector_test.go
+- **Learnings for future iterations:**
+  - When implementing secret detection, prioritize common non-secrets first to avoid false positives
+  - String-based heuristics work well: base64 length, JWT prefix patterns, URL credential patterns
+  - Generate format-hint placeholders that preserve the original value's prefix for better UX
+  - JWT detection requires length check (>50 chars) to avoid false positives on short JWT-like strings
+  - Base64 detection should exclude JWT strings to avoid double detection
+---
+
+## [2026-02-07 01:15] - US-005
+[Session: https://opncd.ai/s/placeholder]
+- Implemented generator logic for .env.example and .env with comprehensive unit tests
+- GenerateExample() replaces secret values with format-hint placeholders while preserving non-secrets
+- GenerateEnv() performs simple copy for non-interactive mode using slice copying
+- Preserved comments, blank lines, and entry structure as required
+- Comprehensive table-driven tests covering all acceptance criteria and edge cases
+- Files changed: internal/generator/generator.go, internal/generator/generator_test.go, AGENTS.md
+- **Learnings for future iterations:**
+  - Use type switching on Entry interface to handle different entry types from parser
+  - When copying slices in Go, use append() with nil slice to avoid modifying original
+  - GeneratePlaceholder() may return *** for unrecognized patterns (like whsec_ prefix)
+  - PUBLIC_KEY contains "KEY" so it's detected as a secret, which is correct behavior
+  - postgres:// URLs return ***://*** (not https://***) since they're not HTTP/HTTPS
+  - Use staticcheck linting to find optimization opportunities like simple slice copying
+---

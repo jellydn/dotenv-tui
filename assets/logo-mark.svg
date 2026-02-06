@@ -1,0 +1,20 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="edge" x1="32" y1="32" x2="288" y2="288" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="32" y="32" width="256" height="256" rx="30" fill="#0B1220"/>
+  <rect x="32" y="32" width="256" height="256" rx="30" stroke="url(#edge)" stroke-width="6"/>
+
+  <rect x="68" y="72" width="184" height="40" rx="10" fill="#111827"/>
+  <text x="88" y="99" fill="#34D399" font-size="28" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace">.env</text>
+
+  <rect x="68" y="130" width="184" height="126" rx="16" fill="#111827"/>
+  <path d="M127 130V114C127 95.7746 141.775 81 160 81C178.225 81 193 95.7746 193 114V130" stroke="#93C5FD" stroke-width="11" stroke-linecap="round"/>
+  <rect x="116" y="130" width="88" height="126" rx="16" fill="#1F2937"/>
+  <circle cx="160" cy="187" r="10" fill="#34D399"/>
+  <rect x="156" y="197" width="8" height="30" rx="4" fill="#34D399"/>
+</svg>

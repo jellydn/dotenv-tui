@@ -1,0 +1,23 @@
+<svg width="960" height="220" viewBox="0 0 960 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="frame" x1="24" y1="24" x2="216" y2="196" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="24" y="24" width="192" height="172" rx="22" fill="#0B1220"/>
+  <rect x="24" y="24" width="192" height="172" rx="22" stroke="url(#frame)" stroke-width="4"/>
+
+  <rect x="52" y="54" width="136" height="28" rx="8" fill="#111827"/>
+  <text x="68" y="74" fill="#34D399" font-size="20" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace">.env</text>
+
+  <rect x="52" y="98" width="136" height="70" rx="12" fill="#111827"/>
+  <path d="M97 98V89C97 75.7452 107.745 65 121 65C134.255 65 145 75.7452 145 89V98" stroke="#93C5FD" stroke-width="8" stroke-linecap="round"/>
+  <rect x="88" y="98" width="66" height="70" rx="12" fill="#1F2937"/>
+  <circle cx="121" cy="130" r="8" fill="#34D399"/>
+  <rect x="118" y="136" width="6" height="17" rx="3" fill="#34D399"/>
+
+  <text x="254" y="122" fill="#E5E7EB" font-size="68" font-weight="700" letter-spacing="1.2" font-family="system-ui, -apple-system, Segoe UI, Ubuntu, Cantarell, Noto Sans, sans-serif">dotenv-tui</text>
+  <text x="258" y="157" fill="#93A3B8" font-size="22" letter-spacing="0.6" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace">secure .env workflows in your terminal</text>
+</svg>

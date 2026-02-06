@@ -159,6 +159,16 @@ type Entry interface {
 - `golangci-lint` (linting)
 - `goimports` (import formatting)
 
+## Code Package Patterns
+
+### Generator Package (`internal/generator/`)
+
+- Uses type switching to handle different `Entry` types from parser
+- `GenerateExample()` leverages `detector.IsSecret()` and `detector.GeneratePlaceholder()` for secret masking
+- `GenerateEnv()` performs simple copy using `append()` with slice copying for non-interactive mode
+- Placeholders preserve format hints (prefix patterns) to maintain context for users
+- Quoted values are unquoted when replaced with placeholders for consistency
+
 ## Notes
 
 - Preserve comments and blank lines when parsing .env files
