@@ -14,6 +14,7 @@ type model struct {
 	menu          tui.MenuModel
 	picker        tui.PickerModel
 	preview       tui.PreviewModel
+	form          tui.FormModel
 }
 
 type screen int
@@ -22,6 +23,7 @@ const (
 	menuScreen screen = iota
 	pickerScreen
 	previewScreen
+	formScreen
 )
 
 func initialModel() model {
@@ -43,6 +45,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return updatePicker(msg, m)
 	case previewScreen:
 		return updatePreview(msg, m)
+	case formScreen:
+		return updateForm(msg, m)
 	}
 	return m, nil
 }
@@ -78,6 +82,11 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 			m.currentScreen = previewScreen
 			// For now, just use the first selected file
 			return m, tui.NewPreviewModel(msg.Selected[0], nil)
+		}
+		// If generating .env, transition to form (assuming first selection is .env.example)
+		if msg.Mode == tui.GenerateEnv && len(msg.Selected) > 0 {
+			m.currentScreen = formScreen
+			return m, tui.NewFormModel(msg.Selected[0])
 		}
 		// For other cases or no selection, go back to menu
 		m.currentScreen = menuScreen
@@ -119,6 +128,30 @@ func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	formModel, formCmd := m.form.Update(msg)
+	m.form = formModel.(tui.FormModel)
+	cmd = formCmd
+
+	switch msg := msg.(type) {
+	case tui.FormFinishedMsg:
+		// Go back to menu after form is finished
+		m.currentScreen = menuScreen
+		m.menu = tui.NewMenuModel()
+		return m, nil
+	case tea.KeyMsg:
+		if msg.String() == "q" || msg.String() == "esc" {
+			// Return to menu
+			m.currentScreen = menuScreen
+			m.menu = tui.NewMenuModel()
+			return m, nil
+		}
+	}
+
+	return m, cmd
+}
+
 func (m model) View() string {
 	switch m.currentScreen {
 	case menuScreen:
@@ -127,6 +160,8 @@ func (m model) View() string {
 		return m.picker.View()
 	case previewScreen:
 		return m.preview.View()
+	case formScreen:
+		return m.form.View()
 	default:
 		return ""
 	}
