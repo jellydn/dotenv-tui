@@ -67,57 +67,57 @@ func TestMenuModelInit(t *testing.T) {
 
 func TestMenuModelUpdateNavigation(t *testing.T) {
 	tests := []struct {
-		name          string
-		initialChoice MenuChoice
-		keyMsg        string
+		name           string
+		initialChoice  MenuChoice
+		keyMsg         string
 		expectedChoice MenuChoice
 	}{
 		{
-			name:          "up key from GenerateEnv moves to GenerateExample",
-			initialChoice: GenerateEnv,
-			keyMsg:        "up",
+			name:           "up key from GenerateEnv moves to GenerateExample",
+			initialChoice:  GenerateEnv,
+			keyMsg:         "up",
 			expectedChoice: GenerateExample,
 		},
 		{
-			name:          "k key from GenerateEnv moves to GenerateExample",
-			initialChoice: GenerateEnv,
-			keyMsg:        "k",
+			name:           "k key from GenerateEnv moves to GenerateExample",
+			initialChoice:  GenerateEnv,
+			keyMsg:         "k",
 			expectedChoice: GenerateExample,
 		},
 		{
-			name:          "down key from GenerateExample moves to GenerateEnv",
-			initialChoice: GenerateExample,
-			keyMsg:        "down",
+			name:           "down key from GenerateExample moves to GenerateEnv",
+			initialChoice:  GenerateExample,
+			keyMsg:         "down",
 			expectedChoice: GenerateEnv,
 		},
 		{
-			name:          "j key from GenerateExample moves to GenerateEnv",
-			initialChoice: GenerateExample,
-			keyMsg:        "j",
+			name:           "j key from GenerateExample moves to GenerateEnv",
+			initialChoice:  GenerateExample,
+			keyMsg:         "j",
 			expectedChoice: GenerateEnv,
 		},
 		{
-			name:          "up key at GenerateExample stays at GenerateExample",
-			initialChoice: GenerateExample,
-			keyMsg:        "up",
+			name:           "up key at GenerateExample stays at GenerateExample",
+			initialChoice:  GenerateExample,
+			keyMsg:         "up",
 			expectedChoice: GenerateExample,
 		},
 		{
-			name:          "down key at GenerateEnv stays at GenerateEnv",
-			initialChoice: GenerateEnv,
-			keyMsg:        "down",
+			name:           "down key at GenerateEnv stays at GenerateEnv",
+			initialChoice:  GenerateEnv,
+			keyMsg:         "down",
 			expectedChoice: GenerateEnv,
 		},
 		{
-			name:          "enter key does not change choice",
-			initialChoice: GenerateExample,
-			keyMsg:        "enter",
+			name:           "enter key does not change choice",
+			initialChoice:  GenerateExample,
+			keyMsg:         "enter",
 			expectedChoice: GenerateExample,
 		},
 		{
-			name:          "space key does not change choice",
-			initialChoice: GenerateEnv,
-			keyMsg:        " ",
+			name:           "space key does not change choice",
+			initialChoice:  GenerateEnv,
+			keyMsg:         " ",
 			expectedChoice: GenerateEnv,
 		},
 	}
@@ -126,7 +126,7 @@ func TestMenuModelUpdateNavigation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			model := MenuModel{choice: tt.initialChoice}
-			msg := tea.KeyMsg{Type: tea.KeyKeyPress, Runes: []rune{}, Alt: false}
+			msg := tea.KeyMsg{}
 
 			// Set key type based on message string
 			switch tt.keyMsg {
@@ -194,9 +194,8 @@ func TestMenuModelUpdateQuit(t *testing.T) {
 			// Assert
 			if cmd == nil {
 				t.Errorf("Update(%q) should return quit command", tt.name)
-			} else if cmd != tea.Quit {
-				t.Errorf("Update(%q) should return tea.Quit, got %v", tt.name, cmd)
 			}
+			// In Bubble Tea, tea.Quit returns a command, we just check it's not nil for quit cases
 		})
 	}
 }

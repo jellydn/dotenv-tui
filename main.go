@@ -1,9 +1,14 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"dotenv-tui/internal/generator"
+	"dotenv-tui/internal/parser"
+	"dotenv-tui/internal/scanner"
 	"dotenv-tui/internal/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -168,9 +173,166 @@ func (m model) View() string {
 }
 
 func main() {
+	var (
+		generateExample = flag.String("generate-example", "", "Generate .env.example from specified .env file")
+		generateEnv     = flag.String("generate-env", "", "Generate .env from specified .env.example file")
+		showHelp        = flag.Bool("help", false, "Show help information")
+		scanFlag        = flag.Bool("scan", false, "Scan directory for .env files")
+	)
+
+	flag.Parse()
+
+	if *showHelp {
+		showUsage()
+		return
+	}
+
+	if *generateExample != "" {
+		if err := generateExampleFile(*generateExample); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating .env.example: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *generateEnv != "" {
+		if err := generateEnvFile(*generateEnv); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating .env: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *scanFlag {
+		// Check if next argument is a directory path
+		args := flag.Args()
+		scanPath := "."
+		if len(args) > 0 {
+			scanPath = args[0]
+		}
+		if err := scanAndList(scanPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Error scanning directory: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// No flags provided, launch TUI
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v", err)
 		os.Exit(1)
 	}
+}
+
+func showUsage() {
+	fmt.Printf(`dotenv-tui - A terminal UI tool for managing .env files
+
+USAGE:
+    dotenv-tui [FLAGS]
+
+FLAGS:
+    --generate-example <path>    Generate .env.example from specified .env file
+    --generate-env <path>        Generate .env from specified .env.example file
+    --scan [directory]           List discovered .env files (default: current directory)
+    --help                       Show this help message
+
+EXAMPLES:
+    dotenv-tui                                    # Launch interactive TUI
+    dotenv-tui --generate-example .env            # Generate .env.example from .env
+    dotenv-tui --generate-env .env.example       # Generate .env from .env.example
+    dotenv-tui --scan                             # Scan current directory for .env files
+    dotenv-tui --scan ./myproject                 # Scan specific directory
+`)
+}
+
+func generateExampleFile(inputPath string) error {
+	// Read the input .env file
+	file, err := os.Open(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to open input file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	entries, err := parser.Parse(file)
+	if err != nil {
+		return fmt.Errorf("failed to parse .env file: %w", err)
+	}
+
+	// Generate example entries
+	exampleEntries := generator.GenerateExample(entries)
+
+	// Determine output path
+	outputPath := inputPath + ".example"
+
+	// Write to output file
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer func() { _ = outFile.Close() }()
+
+	if err := parser.Write(outFile, exampleEntries); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
+
+	fmt.Printf("Generated %s\n", outputPath)
+	return nil
+}
+
+func generateEnvFile(inputPath string) error {
+	// Read the input .env.example file
+	file, err := os.Open(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to open input file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	entries, err := parser.Parse(file)
+	if err != nil {
+		return fmt.Errorf("failed to parse .env.example file: %w", err)
+	}
+
+	// Generate env entries (copy)
+	envEntries := generator.GenerateEnv(entries)
+
+	// Determine output path
+	outputPath := filepath.Join(filepath.Dir(inputPath), ".env")
+
+	// Write to output file
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer func() { _ = outFile.Close() }()
+
+	if err := parser.Write(outFile, envEntries); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
+
+	fmt.Printf("Generated %s\n", outputPath)
+	return nil
+}
+
+func scanAndList(dir string) error {
+	if dir == "" {
+		dir = "."
+	}
+
+	files, err := scanner.Scan(dir)
+	if err != nil {
+		return fmt.Errorf("failed to scan directory: %w", err)
+	}
+
+	if len(files) == 0 {
+		fmt.Println("No .env files found")
+		return nil
+	}
+
+	fmt.Printf("Found %d .env file(s):\n", len(files))
+	for _, file := range files {
+		fmt.Printf("  %s\n", file)
+	}
+
+	return nil
 }

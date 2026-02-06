@@ -109,7 +109,7 @@ func isPlaceholderValue(value string) bool {
 	return strings.Contains(lower, "your_") ||
 		strings.Contains(lower, "_here") ||
 		strings.Contains(lower, "placeholder") ||
-		strings.Contains(lower, "example") ||
+		(strings.Contains(lower, "example") && !strings.Contains(lower, "://")) ||
 		value == "***" ||
 		strings.HasPrefix(value, "sk_") && strings.HasSuffix(value, "***") ||
 		strings.HasPrefix(value, "ghp_") && strings.HasSuffix(value, "***") ||
