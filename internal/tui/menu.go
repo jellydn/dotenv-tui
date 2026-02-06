@@ -12,21 +12,26 @@ const (
 	generateEnv
 )
 
-type menuModel struct {
+type MenuModel struct {
 	choice menuChoice
 }
 
-func NewMenuModel() menuModel {
-	return menuModel{
+func NewMenuModel() MenuModel {
+	return MenuModel{
 		choice: generateExample,
 	}
 }
 
-func (m menuModel) Init() tea.Cmd {
+// Choice returns the current menu choice
+func (m MenuModel) Choice() menuChoice {
+	return m.choice
+}
+
+func (m MenuModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -41,14 +46,14 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter", " ":
-			// For now, just quit. In future stories, this will transition to file picker
-			return m, tea.Quit
+			// Transition to file picker
+			return m, NewPickerModel(m.choice, ".")
 		}
 	}
 	return m, nil
 }
 
-func (m menuModel) View() string {
+func (m MenuModel) View() string {
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#FAFAFA")).
