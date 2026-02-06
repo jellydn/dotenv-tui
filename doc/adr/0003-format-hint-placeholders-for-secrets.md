@@ -18,24 +18,26 @@ When generating `.env.example`, secret values must be replaced with placeholders
 
 Use format-hint placeholders that preserve recognizable prefixes from the original value:
 
-| Original value | Placeholder |
-|---|---|
-| `sk_live_abc123def456` | `sk_***` |
-| `ghp_xxxxxxxxxxxx` | `ghp_***` |
-| `eyJhbGciOiJIUzI1NiJ9...` | `eyJ***` |
-| `https://user:pass@host` | `https://***` |
-| Unknown pattern | `***` |
+| Original value            | Placeholder   |
+| ------------------------- | ------------- |
+| `sk_live_abc123def456`    | `sk_***`      |
+| `ghp_xxxxxxxxxxxx`        | `ghp_***`     |
+| `eyJhbGciOiJIUzI1NiJ9...` | `eyJ***`      |
+| `https://user:pass@host`  | `https://***` |
+| Unknown pattern           | `***`         |
 
 Detection is based on both key name patterns (SECRET, TOKEN, PASSWORD, etc.) and value shape (base64, JWT, URL with credentials, hex strings).
 
 ## Consequences
 
 ### Positive
+
 - Developers immediately know what format/provider a secret belongs to (Stripe, GitHub, JWT, etc.)
 - Reduces onboarding friction — no need to ask "what does this key look like?"
 - More useful than generic placeholders while still safe to commit
 
 ### Negative
+
 - Prefix leaks minimal information about the service provider (generally acceptable since `.env.example` keys already reveal this)
 - Heuristic-based detection may not cover all prefix patterns; needs a fallback (`***`)
 - Must be kept up-to-date as new providers/formats emerge

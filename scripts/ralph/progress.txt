@@ -15,3 +15,32 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - TTY errors expected when testing Bubble Tea programs in non-interactive environments
   - Module name uses simple format (dotenv-tui instead of github.com/user/dotenv-tui)
 ---
+
+## [2026-02-07 00:32] - US-002
+[Session: https://opncd.ai/s/placeholder]
+- Implemented .env file parser with comment and structure preservation
+- Created Entry interface with KeyValue, Comment, and BlankLine types
+- Parse() function handles KEY=VALUE, quoted values, export prefix, comments, and blank lines
+- Write() function reproduces original file structure exactly
+- Comprehensive unit tests covering all formats and round-trip preservation
+- Files changed: internal/parser/parser.go, internal/parser/parser_test.go
+- **Learnings for future iterations:**
+  - Use interface{} pattern for extensible entry types (Entry interface)
+  - Table-driven tests work well for parser validation
+  - bufio.Scanner is the right choice for line-by-line parsing
+  - Preserve original formatting (quotes, export prefix) for exact round-trip
+---
+
+## [2026-02-07 00:34] - US-003
+[Session: https://opncd.ai/s/placeholder]
+- Implemented directory scanner for .env file discovery with recursive search
+- Scan() function finds .env, .env.*, but excludes .env.example and .env.*.example variants
+- Skips dependency directories: node_modules, .git, vendor, dist, build, .next, .nuxt, __pycache__
+- Comprehensive unit tests using temp directory structures covering all acceptance criteria
+- Files changed: internal/scanner/scanner.go, internal/scanner/scanner_test.go
+- **Learnings for future iterations:**
+  - filepath.WalkDir is more efficient than filepath.Walk for directory traversal
+  - Use fs.SkipDir to skip entire directories when dependency dirs are detected
+  - Table-driven tests with subtests work well for scanner validation with temp directories
+  - Map lookup is faster for checking skipped directory names
+---
