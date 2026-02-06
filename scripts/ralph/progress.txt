@@ -76,3 +76,38 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - postgres:// URLs return ***://*** (not https://***) since they're not HTTP/HTTPS
   - Use staticcheck linting to find optimization opportunities like simple slice copying
 ---
+
+## [2026-02-07 01:45] - US-006
+[Session: https://opncd.ai/s/placeholder]
+- Implemented TUI main menu with mode selection using Bubble Tea framework
+- Created menu.go with two options: Generate .env.example and Generate .env
+- Added arrow key navigation (up/k, down/j) with selection highlighting
+- Implemented quit functionality (q/Ctrl+C) with proper screen cleanup
+- Styled with Lip Gloss: colored title, highlighted selection, help text at bottom
+- Updated main.go to launch menu as root model instead of basic quit model
+- Files changed: internal/tui/menu.go, main.go
+- **Learnings for future iterations:**
+  - Use lipgloss.NewStyle() for consistent styling across TUI components
+  - MenuChoice enum pattern works well for managing menu state
+  - Bubble Tea's Model-Update-View pattern keeps code organized
+  - Import path uses module name (dotenv-tui) for internal packages
+  - For now, Enter key quits - future stories will transition to file picker
+---
+
+## [2026-02-07 01:06] - US-007
+[Session: https://opncd.ai/s/placeholder]
+- Implemented TUI file picker with scan results using Bubble Tea framework
+- Created picker.go with checklist interface for .env file selection
+- Added checkbox toggling with space key, arrow key navigation, and Enter confirmation
+- Integrated scanner.Scan() to populate the file list on initialization
+- Updated menu.go to transition to picker when Enter is pressed
+- Modified main.go to handle screen transitions between menu and picker
+- Files changed: internal/tui/picker.go, internal/tui/menu.go, main.go
+- **Learnings for future iterations:**
+  - Export types (MenuModel, PickerModel) when they need to be accessed from other packages
+  - Use tea.Model interface for type assertions when updating models in main application
+  - Bubble Tea message types should be exported (PickerFinishedMsg) for cross-package communication
+  - Screen management pattern works well: enum for current screen + switch in Update/View methods
+  - Scanner integration is straightforward - just call Scan() in picker initialization
+  - Default selection behavior (select all files) provides good UX for file pickers
+---
