@@ -32,11 +32,19 @@ dotenv-tui fixes this with two commands:
 
 ## Install
 
+### Quick install (Linux/macOS)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jellydn/dotenv-tui/main/install.sh | sh
+```
+
+### Using Go
+
 ```sh
 go install github.com/jellydn/dotenv-tui@latest
 ```
 
-Or build from source:
+### Build from source
 
 ```sh
 git clone https://github.com/jellydn/dotenv-tui.git && cd dotenv-tui
