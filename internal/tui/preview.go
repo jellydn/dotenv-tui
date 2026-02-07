@@ -69,8 +69,8 @@ func NewPreviewModel(filePath string, fileIndex, totalFiles int) tea.Cmd {
 		var diffLines []string
 		for i, orig := range originalEntries {
 			if i < len(generatedEntries) {
-				origLine := entryToString(orig)
-				genLine := entryToString(generatedEntries[i])
+				origLine := parser.EntryToString(orig)
+				genLine := parser.EntryToString(generatedEntries[i])
 
 				if origLine == genLine {
 					diffLines = append(diffLines, fmt.Sprintf("  %s", origLine))
@@ -102,30 +102,6 @@ type previewInitMsg struct {
 	fileIndex        int
 	totalFiles       int
 	filePath         string
-}
-
-// entryToString converts a parser Entry to its string representation.
-func entryToString(entry parser.Entry) string {
-	switch e := entry.(type) {
-	case parser.KeyValue:
-		line := ""
-		if e.Exported {
-			line += "export "
-		}
-		line += e.Key + "="
-		if e.Quoted != "" {
-			line += e.Quoted + e.Value + e.Quoted
-		} else {
-			line += e.Value
-		}
-		return line
-	case parser.Comment:
-		return e.Text
-	case parser.BlankLine:
-		return ""
-	default:
-		return ""
-	}
 }
 
 // Init initializes the preview model.
@@ -207,7 +183,7 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // writeFile writes the generated entries to the output .env.example file.
 func (m PreviewModel) writeFile() error {
-	file, err := os.Create(m.outputPath)
+	file, err := os.OpenFile(m.outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
