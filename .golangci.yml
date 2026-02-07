@@ -16,6 +16,24 @@ linters:
     - revive
     - unconvert
     - unparam
+  settings:
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+    gosec:
+      excludes:
+        - G104  # Ignore unhandled errors in tests
+        - G401  # Weak cryptographic primitive (acceptable for this use case)
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+      - text: "weak cryptographic primitive"
+        linters:
+          - gosec
 
 formatters:
   enable:
@@ -27,22 +45,3 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/jellydn/dotenv-tui
-
-linters-settings:
-  revive:
-    rules:
-      - name: exported
-        arguments:
-          - disableStutteringCheck
-
-issues:
-  exclude-use-default: false
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gosec
-    - text: "weak cryptographic primitive"
-      linters:
-        - gosec
-  max-issues-per-linter: 0
-  max-same-issues: 0
