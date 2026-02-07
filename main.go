@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/jellydn/dotenv-tui/internal/generator"
 	"github.com/jellydn/dotenv-tui/internal/parser"
@@ -14,8 +15,24 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Version is set at build time via ldflags
-var Version = "dev"
+// Version is set at build time via ldflags, or read from module info when using go install
+var Version = ""
+
+// getVersion returns the version string, checking build info first, then falling back to ldflags
+func getVersion() string {
+	if Version != "" {
+		return Version
+	}
+
+	// Try to get version from build info (works with go install)
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if info.Main.Version != "" && info.Main.Version != "(devel)" {
+			return info.Main.Version
+		}
+	}
+
+	return "dev"
+}
 
 type model struct {
 	currentScreen screen
@@ -188,7 +205,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("dotenv-tui version %s\n", Version)
+		fmt.Printf("dotenv-tui version %s\n", getVersion())
 		return
 	}
 
