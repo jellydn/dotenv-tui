@@ -2,20 +2,22 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/jellydn/dotenv-tui/internal/generator"
 	"github.com/jellydn/dotenv-tui/internal/parser"
 	"github.com/jellydn/dotenv-tui/internal/scanner"
 	"github.com/jellydn/dotenv-tui/internal/tui"
 	"github.com/jellydn/dotenv-tui/internal/upgrade"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 var Version = ""
@@ -58,7 +60,6 @@ const (
 	doneScreen
 )
 
-// initialModel creates and returns the initial model state for the application.
 func initialModel() model {
 	return model{
 		currentScreen: menuScreen,
@@ -90,12 +91,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateMenu handles messages for the menu screen.
 func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	menuModel, menuCmd := m.menu.Update(msg)
 	m.menu = menuModel.(tui.MenuModel)
-	cmd = menuCmd
+	cmd := menuCmd
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "enter" || keyMsg.String() == " " {
@@ -108,12 +107,10 @@ func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// updatePicker handles messages for the file picker screen.
 func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	pickerModel, pickerCmd := m.picker.Update(msg)
 	m.picker = pickerModel.(tui.PickerModel)
-	cmd = pickerCmd
+	cmd := pickerCmd
 
 	switch msg := msg.(type) {
 	case tui.PickerFinishedMsg:
@@ -143,12 +140,10 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// updatePreview handles messages for the preview screen.
 func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	previewModel, previewCmd := m.preview.Update(msg)
 	m.preview = previewModel.(tui.PreviewModel)
-	cmd = previewCmd
+	cmd := previewCmd
 
 	switch msg := msg.(type) {
 	case tui.PreviewFinishedMsg:
@@ -163,12 +158,10 @@ func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// updateForm handles messages for the form screen.
 func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	formModel, formCmd := m.form.Update(msg)
 	m.form = formModel.(tui.FormModel)
-	cmd = formCmd
+	cmd := formCmd
 
 	switch msg := msg.(type) {
 	case tui.FormFinishedMsg:
@@ -185,16 +178,15 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 // navigateToFile transitions to the appropriate screen (preview or form)
 // for the current file index in the file list.
-func (m *model) navigateToFile() (tea.Model, tea.Cmd) {
+func (m model) navigateToFile() (tea.Model, tea.Cmd) {
 	if m.pickerMode == tui.GenerateExample {
 		m.currentScreen = previewScreen
-		return *m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+		return m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 	}
 	m.currentScreen = formScreen
-	return *m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+	return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 }
 
-// returnToMenu returns the model to the menu screen, resetting any state.
 func returnToMenu(m model) tea.Model {
 	m.currentScreen = menuScreen
 	m.menu = tui.NewMenuModel()
@@ -223,8 +215,6 @@ func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// viewDone renders the completion screen view showing the status
-// of processed files with navigation options.
 func (m model) viewDone() string {
 	var title string
 	if m.pickerMode == tui.GenerateExample {
@@ -276,6 +266,7 @@ func main() {
 		showHelp        = flag.Bool("help", false, "Show help information")
 		showVersion     = flag.Bool("version", false, "Show version information")
 		scanFlag        = flag.Bool("scan", false, "Scan directory for .env files")
+		yoloFlag        = flag.Bool("yolo", false, "Auto-generate .env from all .env.example files")
 		forceFlag       = flag.Bool("force", false, "Force overwrite existing files")
 		upgradeFlag     = flag.Bool("upgrade", false, "Upgrade to the latest version")
 	)
@@ -321,6 +312,14 @@ func main() {
 		return
 	}
 
+	if *yoloFlag {
+		if err := generateAllEnvFiles(*forceFlag); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if *upgradeFlag {
 		if err := upgrade.Upgrade(getVersion()); err != nil {
 			fmt.Fprintf(os.Stderr, "Error upgrading: %v\n", err)
@@ -346,6 +345,7 @@ FLAGS:
     --generate-example <path>    Generate .env.example from specified .env file
     --generate-env <path>        Generate .env from specified .env.example file
     --scan [directory]           List discovered .env files (default: current directory)
+    --yolo                       Auto-generate .env from all .env.example files
     --force                      Force overwrite existing files
     --upgrade                    Upgrade to the latest version
     --version                    Show version information
@@ -354,11 +354,13 @@ FLAGS:
 EXAMPLES:
     dotenv-tui                                    # Launch interactive TUI
     dotenv-tui --generate-example .env            # Generate .env.example from .env
-    dotenv-tui --generate-env .env.example       # Generate .env from .env.example
+    dotenv-tui --generate-env .env.example        # Generate .env from .env.example
     dotenv-tui --scan                             # Scan current directory for .env files
     dotenv-tui --scan ./myproject                 # Scan specific directory
+    dotenv-tui --yolo                             # Auto-generate .env from all .env.example files
+    dotenv-tui --yolo --force                     # Force overwrite existing .env files
     dotenv-tui --upgrade                          # Upgrade to the latest version
-`)
+ `)
 }
 
 type entryProcessor func([]parser.Entry) []parser.Entry
@@ -427,5 +429,84 @@ func scanAndList(dir string) error {
 		fmt.Printf("  %s\n", file)
 	}
 
+	return nil
+}
+
+func generateAllEnvFiles(force bool) error {
+	exampleFiles, err := scanner.ScanExamples(".")
+	if err != nil {
+		return fmt.Errorf("failed to scan for .env.example files: %w", err)
+	}
+
+	if len(exampleFiles) == 0 {
+		return fmt.Errorf("no .env.example files found")
+	}
+
+	fmt.Printf("Found %d .env.example file(s):\n", len(exampleFiles))
+	for _, file := range exampleFiles {
+		fmt.Printf("  %s\n", file)
+	}
+
+	var generated, skipped int
+	for _, exampleFile := range exampleFiles {
+		if err := processExampleFile(exampleFile, force, &generated, &skipped); err != nil {
+			return err
+		}
+	}
+
+	fmt.Printf("Done: %d generated, %d skipped\n", generated, skipped)
+	return nil
+}
+
+func processExampleFile(exampleFile string, force bool, generated, skipped *int) error {
+	outputPath := strings.TrimSuffix(exampleFile, ".example")
+
+	file, err := os.Open(exampleFile)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %w", exampleFile, err)
+	}
+
+	entries, err := parser.Parse(file)
+	if err != nil {
+		_ = file.Close()
+		return fmt.Errorf("failed to parse %s: %w", exampleFile, err)
+	}
+
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close %s: %w", exampleFile, err)
+	}
+
+	if _, err := os.Stat(outputPath); err == nil && !force {
+		fmt.Printf("%s already exists. Overwrite? [y/N] ", outputPath)
+		reader := bufio.NewReader(os.Stdin)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read user input: %w", err)
+		}
+		response = strings.TrimSpace(response)
+
+		if response != "y" && response != "Y" {
+			fmt.Printf("Skipped %s\n", outputPath)
+			*skipped++
+			return nil
+		}
+	}
+
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create %s: %w", outputPath, err)
+	}
+
+	if err := parser.Write(outFile, entries); err != nil {
+		_ = outFile.Close()
+		return fmt.Errorf("failed to write %s: %w", outputPath, err)
+	}
+
+	if err := outFile.Close(); err != nil {
+		return fmt.Errorf("failed to close %s: %w", outputPath, err)
+	}
+
+	fmt.Printf("Generated %s\n", outputPath)
+	*generated++
 	return nil
 }

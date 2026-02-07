@@ -255,6 +255,73 @@
       "priority": 15,
       "passes": true,
       "notes": "Implemented file path and position counter display on both preview and form screens. Added fileIndex and totalFiles fields to models and updated View methods to show position in format '[current/total] filepath'. Counter updates correctly during Tab/Shift+Tab navigation."
+    },
+    {
+      "id": "US-016",
+      "title": "--yolo flag: register CLI flag and scan for .env.example files",
+      "description": "As a developer, I want a --yolo flag that scans the project for .env.example files so I can auto-generate .env files without the TUI.",
+      "acceptanceCriteria": [
+        "main.go registers --yolo as flag.Bool with description 'Auto-generate .env from all .env.example files'",
+        "When --yolo is set, calls scanner.ScanExamples('.') to discover .env.example files recursively",
+        "Does NOT launch the TUI",
+        "If no .env.example files found, prints 'No .env.example files found' to stderr and exits with code 1",
+        "If files found, prints 'Found N .env.example file(s):' followed by each path",
+        "showUsage() updated to include --yolo flag description and example",
+        "go build succeeds",
+        "go test ./... passes"
+      ],
+      "priority": 16,
+      "passes": true,
+      "notes": "Implemented --yolo CLI flag registration and scanning for .env.example files. Added generateAllEnvFiles() function that discovers .env.example files using scanner.ScanExamples(), handles no files case with proper error message and exit code, and prints list of found files. Updated showUsage() to include --yolo flag description."
+    },
+    {
+      "id": "US-017",
+      "title": "--yolo flag: generate .env from each .env.example with values as-is",
+      "description": "As a developer, I want --yolo to generate .env files from discovered .env.example files using example values unchanged so I can start the project immediately.",
+      "acceptanceCriteria": [
+        "For each .env.example found, derives output path by removing .example suffix (e.g., .env.example -> .env, .env.staging.example -> .env.staging)",
+        "Parses each .env.example with parser.Parse and writes entries unchanged with parser.Write to the output path",
+        "Preserves comments and blank lines from the example file",
+        "Prints success message per file (e.g., 'Generated apps/web/.env')",
+        "go build succeeds",
+        "go test ./... passes"
+      ],
+      "priority": 17,
+      "passes": true,
+      "notes": "Implemented .env generation from .env.example files with values as-is. Added logic to derive output path by removing .example suffix, parse each file with parser.Parse(), write entries unchanged with parser.Write(), and preserve comments and blank lines. Includes proper error handling and success messages per file."
+    },
+    {
+      "id": "US-018",
+      "title": "--yolo flag: prompt before overwriting existing .env files",
+      "description": "As a developer, I want to be asked before an existing .env is overwritten so I don't accidentally lose my configuration.",
+      "acceptanceCriteria": [
+        "If output .env already exists and --force is NOT set, prints prompt: '<path> already exists. Overwrite? [y/N]'",
+        "Default is No (pressing Enter skips the file)",
+        "Typing 'y' or 'Y' overwrites the file",
+        "Any other input (or just Enter) skips with message 'Skipped <path>'",
+        "When --force is combined with --yolo, skips all prompts and overwrites unconditionally",
+        "Uses bufio.NewReader(os.Stdin) for reading confirmation input",
+        "go build succeeds",
+        "go test ./... passes"
+      ],
+      "priority": 18,
+      "passes": true,
+      "notes": "Implemented interactive prompt before overwriting existing .env files. Added prompt '<path> already exists. Overwrite? [y/N]' with default to No, accepts 'y'/'Y' to overwrite, skips other input with 'Skipped <path>' message. Uses bufio.NewReader(os.Stdin) for reading confirmation input. --force flag skips all prompts and overwrites unconditionally."
+    },
+    {
+      "id": "US-019",
+      "title": "--yolo flag: summary output after completion",
+      "description": "As a developer, I want a summary of what was generated and skipped so I know the result at a glance.",
+      "acceptanceCriteria": [
+        "After processing all files, prints summary line: 'Done: N generated, M skipped'",
+        "Count tracks files generated vs skipped (due to user declining overwrite)",
+        "Exits with code 0 on success (at least one file processed or skipped)",
+        "go build succeeds",
+        "go test ./... passes"
+      ],
+      "priority": 19,
+      "passes": true,
+      "notes": "Implemented summary output after completion. Added generated and skipped counters to track file processing, prints 'Done: N generated, M skipped' after all files processed. Handles both fresh generation and skip scenarios. Always exits with code 0 for success."
     }
   ]
 }
