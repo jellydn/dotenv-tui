@@ -2,11 +2,13 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 
 	"github.com/jellydn/dotenv-tui/internal/generator"
 	"github.com/jellydn/dotenv-tui/internal/parser"
@@ -471,8 +473,17 @@ func generateAllEnvFiles(force bool) error {
 			return fmt.Errorf("failed to parse %s: %w", exampleFile, err)
 		}
 
+		// Check if file exists and prompt for overwrite if not using force
 		if _, err := os.Stat(outputPath); err == nil && !force {
-			return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
+			fmt.Printf("%s already exists. Overwrite? [y/N] ", outputPath)
+			reader := bufio.NewReader(os.Stdin)
+			response, _ := reader.ReadString('\n')
+			response = strings.TrimSpace(response)
+
+			if response != "y" && response != "Y" {
+				fmt.Printf("Skipped %s\n", outputPath)
+				continue
+			}
 		}
 
 		outFile, err := os.Create(outputPath)

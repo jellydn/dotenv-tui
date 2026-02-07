@@ -301,3 +301,21 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Test both with and without --force flag to ensure proper behavior
   - Comments and blank lines are preserved automatically when using parser.Write()
 ---
+
+## [2026-02-07 00:23] - US-018
+[Session: https://opncd.ai/s/placeholder]
+- Implemented interactive prompt before overwriting existing .env files
+- Added prompt '<path> already exists. Overwrite? [y/N]' with default to No behavior
+- Used bufio.NewReader(os.Stdin) for reading user confirmation input
+- Added logic to accept 'y'/'Y' to overwrite, skip other input with 'Skipped <path>' message
+- Maintained --force flag behavior that skips all prompts and overwrites unconditionally
+- Added strings import for trimming whitespace from user input
+- Files changed: main.go, scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - Use bufio.NewReader(os.Stdin) for interactive CLI input reading
+  - strings.TrimSpace() is essential for cleaning up user input before processing
+  - Default to No behavior requires checking for specific positive responses ('y'/'Y')
+  - Continue statement is useful for skipping files when user declines overwrite
+  - Test interactive prompts using echo with piped input for automated testing
+  - When using defer for file closure, ensure it's placed after the file exists check
+---
