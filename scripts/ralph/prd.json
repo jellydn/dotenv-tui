@@ -169,6 +169,92 @@
       "priority": 10,
       "passes": true,
       "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Scanner: add ScanExamples function for .env.example file discovery",
+      "description": "As a developer, I need a scanner function that finds .env.example files so the GenerateEnv picker shows the correct files.",
+      "acceptanceCriteria": [
+        "internal/scanner/scanner.go adds ScanExamples(root string) ([]string, error) that returns only .env.example and .env.*.example files",
+        "ScanExamples skips the same directories as Scan (node_modules, .git, vendor, dist, build, .next, .nuxt, __pycache__)",
+        "Existing Scan() function behavior is unchanged (still excludes .example files)",
+        "Unit tests in internal/scanner/scanner_test.go cover ScanExamples with temp directory structure",
+        "go test ./internal/scanner/ passes",
+        "go build succeeds"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Picker: default to no selection and filter files by mode",
+      "description": "As a user, I want the picker to start with nothing selected and only show files relevant to the chosen mode (GenerateExample shows .env files, GenerateEnv shows .env.example files).",
+      "acceptanceCriteria": [
+        "NewPickerModel initializes selected map with all values set to false (none selected by default)",
+        "When mode is GenerateExample, picker calls scanner.Scan() to show .env files (current behavior)",
+        "When mode is GenerateEnv, picker calls scanner.ScanExamples() to show .env.example files",
+        "Space toggles selection on current file, 'a' toggles all files (select all / deselect all)",
+        "Enter confirms selection and sends PickerFinishedMsg with selected files",
+        "If no files selected when Enter is pressed, do nothing (don't transition)",
+        "go build succeeds"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Picker: group files by directory with visual headers",
+      "description": "As a user in a monorepo with many .env files, I want files grouped by directory with headers so I can find files quickly.",
+      "acceptanceCriteria": [
+        "PickerModel uses a pickerItem struct with isHeader bool to distinguish directory headers from selectable files",
+        "Files are grouped by filepath.Dir() with a non-selectable directory header rendered above each group",
+        "Directory headers are styled differently (dimmed or bold) and cursor skips them during navigation",
+        "Files within each group are sorted alphabetically",
+        "Groups are sorted alphabetically by directory path",
+        "Space and 'a' keybindings only affect selectable file items, not headers",
+        "go build succeeds"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Sequential file processing with Tab/Shift+Tab navigation",
+      "description": "As a user, after processing one file I want to press Tab to go to the next selected file or Shift+Tab to go to the previous one, without returning to the picker.",
+      "acceptanceCriteria": [
+        "main.go model struct adds fileList []string, fileIndex int, and pickerMode tui.MenuChoice fields",
+        "When PickerFinishedMsg is received, store the full selected file list and start processing fileList[0]",
+        "After PreviewFinishedMsg or FormFinishedMsg, transition to a new 'doneScreen' that shows a status bar: 'Tab: next file • Shift+Tab: prev file • q: back to menu'",
+        "Tab/Shift+Tab file navigation ONLY happens on the doneScreen, NOT during form editing (form.go already uses Tab/Shift+Tab for field navigation between text inputs)",
+        "Tab increments fileIndex and loads the next file in the same mode (preview or form)",
+        "Shift+Tab decrements fileIndex and loads the previous file",
+        "At list boundaries, Tab/Shift+Tab wraps around (last file Tab goes to first, first file Shift+Tab goes to last)",
+        "q or Esc returns to the main menu",
+        "Add doneScreen to the screen enum in main.go with its own updateDone handler",
+        "go build succeeds"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Show current file path and position counter on preview/form screens",
+      "description": "As a user navigating between files, I want to see which file I'm working on and my position in the list.",
+      "acceptanceCriteria": [
+        "PreviewModel and FormModel accept file index and total count as init parameters",
+        "Preview screen header shows current file path and position counter (e.g., '[1/5] apps/cron/.env')",
+        "Form screen header shows current file path and position counter (e.g., '[1/5] packages/api/.env.example')",
+        "Counter updates correctly when navigating with Tab/Shift+Tab",
+        "When only one file is selected, counter shows '[1/1]'",
+        "go build succeeds"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
     }
   ]
 }
