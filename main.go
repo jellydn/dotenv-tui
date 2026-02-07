@@ -60,7 +60,6 @@ const (
 	doneScreen
 )
 
-// initialModel creates and returns the initial model state for the application.
 func initialModel() model {
 	return model{
 		currentScreen: menuScreen,
@@ -92,12 +91,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateMenu handles messages for the menu screen.
 func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	menuModel, menuCmd := m.menu.Update(msg)
 	m.menu = menuModel.(tui.MenuModel)
-	cmd = menuCmd
+	cmd := menuCmd
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "enter" || keyMsg.String() == " " {
@@ -110,12 +107,10 @@ func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// updatePicker handles messages for the file picker screen.
 func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	pickerModel, pickerCmd := m.picker.Update(msg)
 	m.picker = pickerModel.(tui.PickerModel)
-	cmd = pickerCmd
+	cmd := pickerCmd
 
 	switch msg := msg.(type) {
 	case tui.PickerFinishedMsg:
@@ -145,12 +140,10 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// updatePreview handles messages for the preview screen.
 func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	previewModel, previewCmd := m.preview.Update(msg)
 	m.preview = previewModel.(tui.PreviewModel)
-	cmd = previewCmd
+	cmd := previewCmd
 
 	switch msg := msg.(type) {
 	case tui.PreviewFinishedMsg:
@@ -165,12 +158,10 @@ func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// updateForm handles messages for the form screen.
 func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	formModel, formCmd := m.form.Update(msg)
 	m.form = formModel.(tui.FormModel)
-	cmd = formCmd
+	cmd := formCmd
 
 	switch msg := msg.(type) {
 	case tui.FormFinishedMsg:
@@ -187,16 +178,15 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 // navigateToFile transitions to the appropriate screen (preview or form)
 // for the current file index in the file list.
-func (m *model) navigateToFile() (tea.Model, tea.Cmd) {
+func (m model) navigateToFile() (tea.Model, tea.Cmd) {
 	if m.pickerMode == tui.GenerateExample {
 		m.currentScreen = previewScreen
-		return *m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+		return m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 	}
 	m.currentScreen = formScreen
-	return *m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+	return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 }
 
-// returnToMenu returns the model to the menu screen, resetting any state.
 func returnToMenu(m model) tea.Model {
 	m.currentScreen = menuScreen
 	m.menu = tui.NewMenuModel()
@@ -225,8 +215,6 @@ func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// viewDone renders the completion screen view showing the status
-// of processed files with navigation options.
 func (m model) viewDone() string {
 	var title string
 	if m.pickerMode == tui.GenerateExample {
@@ -458,17 +446,13 @@ func generateAllEnvFiles(force bool) error {
 		fmt.Printf("  %s\n", file)
 	}
 
-	// Track counts for summary
 	var generated, skipped int
-
-	// Generate .env files from each .env.example file
 	for _, exampleFile := range exampleFiles {
 		if err := processExampleFile(exampleFile, force, &generated, &skipped); err != nil {
 			return err
 		}
 	}
 
-	// Print summary
 	fmt.Printf("Done: %d generated, %d skipped\n", generated, skipped)
 	return nil
 }
