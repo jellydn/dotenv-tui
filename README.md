@@ -81,6 +81,32 @@ just fmt      # Format code
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss) — Styling
 - [Bubbles](https://github.com/charmbracelet/bubbles) — Input components
 
+## Connect with Me
+
+<div id="badges">
+  <a href="https://www.linkedin.com/in/dunghd">
+    <img src="https://img.shields.io/badge/LinkedIn-blue?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn Badge"/>
+  </a>
+  <a href="https://www.youtube.com/c/ITManVietnam">
+    <img src="https://img.shields.io/badge/YouTube-red?style=for-the-badge&logo=youtube&logoColor=white" alt="Youtube Badge"/>
+  </a>
+  <a href="https://www.twitter.com/jellydn">
+    <img src="https://img.shields.io/badge/Twitter-blue?style=for-the-badge&logo=twitter&logoColor=white" alt="Twitter Badge"/>
+  </a>
+  <a href="https://cv.productsway.com">
+    <img src="https://img.shields.io/badge/Polywork-blue?style=for-the-badge&logo=polywork&logoColor=white" alt="Polywork Badge"/>
+  </a>
+  <a rel="me" href="https://mastodon.online/@jellydn">
+    <img src="https://img.shields.io/badge/Mastodon-blue?style=for-the-badge&logo=mastodon&logoColor=white" alt="Mastodon Badge"/>
+  </a>
+</div>
+
+## Show your support
+
+[![kofi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/dunghd)
+[![paypal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/dunghd)
+[![buymeacoffee](https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/dunghd)
+
 ## License
 
 MIT
