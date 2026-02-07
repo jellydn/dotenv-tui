@@ -13,32 +13,23 @@ func GenerateExample(entries []parser.Entry) []parser.Entry {
 	for _, entry := range entries {
 		switch e := entry.(type) {
 		case parser.KeyValue:
-			// Check if this is a secret
 			if detector.IsSecret(e.Key, e.Value) {
-				// Replace with placeholder
 				placeholder := detector.GeneratePlaceholder(e.Key, e.Value)
 				newKV := parser.KeyValue{
 					Key:      e.Key,
 					Value:    placeholder,
-					Quoted:   "", // Placeholders are not quoted
+					Quoted:   "",
 					Exported: e.Exported,
 				}
 				result = append(result, newKV)
 			} else {
-				// Keep non-secret values as-is
 				result = append(result, e)
 			}
 
-		case parser.Comment:
-			// Preserve comments as-is
-			result = append(result, e)
-
-		case parser.BlankLine:
-			// Preserve blank lines as-is
+		case parser.Comment, parser.BlankLine:
 			result = append(result, e)
 
 		default:
-			// Preserve any unknown entry types as-is
 			result = append(result, e)
 		}
 	}

@@ -13,7 +13,6 @@ import (
 func Scan(root string) ([]string, error) {
 	var envFiles []string
 
-	// Directories to skip
 	skipDirs := map[string]bool{
 		"node_modules": true,
 		".git":         true,
@@ -52,7 +51,6 @@ func Scan(root string) ([]string, error) {
 			return nil
 		}
 
-		// Check if file name matches .env patterns
 		fileName := d.Name()
 		if isEnvFile(fileName) {
 			envFiles = append(envFiles, relPath)

@@ -54,7 +54,6 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter", " ":
-			// Let main handle the screen transition
 			return m, nil
 		}
 	}

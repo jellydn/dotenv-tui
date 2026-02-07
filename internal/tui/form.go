@@ -50,7 +50,6 @@ type formInitMsg struct {
 // NewFormModel creates a new form model for collecting environment variables.
 func NewFormModel(exampleFilePath string) tea.Cmd {
 	return func() tea.Msg {
-		// Read the .env.example file
 		file, err := os.Open(exampleFilePath)
 		if err != nil {
 			return formInitMsg{
@@ -68,26 +67,18 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 			}
 		}
 
-		// Generate initial entries to get proper structure
-		generated := entries
-
 		var fields []FormField
-		for _, entry := range generated {
+		for _, entry := range entries {
 			if kv, ok := entry.(parser.KeyValue); ok {
-				// Check if the value looks like a placeholder
 				isPlaceholder := isPlaceholderValue(kv.Value)
-				var placeholder string
-				var value string
+				var placeholder, value string
 
 				if isPlaceholder {
 					placeholder = generateHint(kv.Key, kv.Value)
-					value = ""
 				} else {
 					value = kv.Value
-					placeholder = ""
 				}
 
-				// Create text input
 				input := textinput.New()
 				input.SetValue(value)
 				input.Placeholder = placeholder
@@ -112,7 +103,6 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 }
 
 func isPlaceholderValue(value string) bool {
-	// Any value ending with *** is a placeholder (covers all generator outputs)
 	if strings.HasSuffix(value, "***") {
 		return true
 	}
@@ -125,7 +115,6 @@ func isPlaceholderValue(value string) bool {
 		}
 	}
 
-	// Example without URLs
 	if strings.Contains(lower, "example") && !strings.Contains(lower, "://") {
 		return true
 	}
@@ -175,7 +164,6 @@ func (m *FormModel) moveCursor(newCursor int) {
 	m.cursor = newCursor
 	m.fields[m.cursor].Input.Focus()
 
-	// Adjust scroll to keep cursor visible
 	if m.cursor < m.scroll {
 		m.scroll = m.cursor
 	} else if m.cursor >= m.scroll+visibleFields {
@@ -242,10 +230,8 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.saveForm()
 		case "enter":
 			if m.cursor == len(m.fields)-1 {
-				// Enter on last field submits
 				return m, m.saveForm()
 			}
-			// Otherwise move to next field
 			if m.cursor < len(m.fields)-1 {
 				m.moveCursor(m.cursor + 1)
 			}
@@ -268,11 +254,8 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m FormModel) saveForm() tea.Cmd {
 	return func() tea.Msg {
-		// Determine output file path (.env)
 		outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
 
-		// Walk original entries and update only KeyValue.Value from form inputs
-		// Preserve comments, blank lines, quotes, and export prefix
 		fieldIndex := 0
 		var entries []parser.Entry
 		for _, entry := range m.originalEntries {
@@ -288,14 +271,11 @@ func (m FormModel) saveForm() tea.Cmd {
 					})
 					fieldIndex++
 				}
-			case parser.Comment:
-				entries = append(entries, e)
-			case parser.BlankLine:
+			case parser.Comment, parser.BlankLine:
 				entries = append(entries, e)
 			}
 		}
 
-		// Write to file
 		file, err := os.Create(outputPath)
 		if err != nil {
 			return FormFinishedMsg{Success: false, Error: fmt.Sprintf("Failed to create file: %v", err)}

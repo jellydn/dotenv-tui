@@ -36,22 +36,18 @@ func Parse(reader io.Reader) ([]Entry, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Trim only trailing whitespace, preserve leading whitespace
 		line = strings.TrimRight(line, " \t\r\n")
 
-		// Skip empty lines (but preserve as BlankLine)
 		if line == "" {
 			entries = append(entries, BlankLine{})
 			continue
 		}
 
-		// Handle comments
 		if strings.HasPrefix(line, "#") {
 			entries = append(entries, Comment{Text: line})
 			continue
 		}
 
-		// Handle key-value pairs
 		if strings.Contains(line, "=") {
 			kv, err := parseKeyValue(line)
 			if err != nil {
@@ -61,7 +57,6 @@ func Parse(reader io.Reader) ([]Entry, error) {
 			continue
 		}
 
-		// If it's not a comment, key-value, or blank, treat as comment
 		entries = append(entries, Comment{Text: line})
 	}
 
@@ -76,13 +71,11 @@ func Parse(reader io.Reader) ([]Entry, error) {
 func parseKeyValue(line string) (KeyValue, error) {
 	var kv KeyValue
 
-	// Check for export prefix
 	if strings.HasPrefix(line, "export ") {
 		kv.Exported = true
-		line = strings.TrimSpace(line[7:]) // Remove "export "
+		line = strings.TrimSpace(line[7:])
 	}
 
-	// Split on first =
 	parts := strings.SplitN(line, "=", 2)
 	if len(parts) != 2 {
 		return KeyValue{}, fmt.Errorf("invalid key-value format")
@@ -91,12 +84,11 @@ func parseKeyValue(line string) (KeyValue, error) {
 	kv.Key = strings.TrimSpace(parts[0])
 	value := parts[1]
 
-	// Handle quoted values
 	if len(value) >= 2 {
 		if (value[0] == '"' && value[len(value)-1] == '"') ||
 			(value[0] == '\'' && value[len(value)-1] == '\'') {
 			kv.Quoted = string(value[0])
-			kv.Value = value[1 : len(value)-1] // Remove quotes
+			kv.Value = value[1 : len(value)-1]
 		} else {
 			kv.Value = value
 		}
@@ -112,9 +104,9 @@ func Write(writer io.Writer, entries []Entry) error {
 	for _, entry := range entries {
 		switch e := entry.(type) {
 		case KeyValue:
-			line := ""
+			var line string
 			if e.Exported {
-				line += "export "
+				line = "export "
 			}
 			line += e.Key + "="
 			if e.Quoted != "" {

@@ -9,22 +9,18 @@ import (
 
 // IsSecret determines if a key-value pair appears to contain a secret
 func IsSecret(key string, value string) bool {
-	// Check for common non-secrets first
 	if isCommonNonSecret(key) {
 		return false
 	}
 
-	// Empty values cannot be secrets
 	if len(value) == 0 {
 		return false
 	}
 
-	// Check key patterns
 	if isSecretKey(key) {
 		return true
 	}
 
-	// Check value patterns
 	if isSecretValue(value) {
 		return true
 	}
@@ -35,12 +31,10 @@ func IsSecret(key string, value string) bool {
 // GeneratePlaceholder creates a format-hint placeholder for a secret.
 // The key parameter is kept for API consistency but not currently used.
 func GeneratePlaceholder(_ string, value string) string {
-	// JWT token pattern
 	if strings.HasPrefix(value, "eyJ") && len(value) > 50 {
 		return "eyJ***"
 	}
 
-	// URL with credentials pattern
 	if strings.Contains(value, "://") && strings.Contains(value, "@") {
 		if strings.HasPrefix(value, "http://") {
 			return "http://***"
@@ -48,10 +42,9 @@ func GeneratePlaceholder(_ string, value string) string {
 		if strings.HasPrefix(value, "https://") {
 			return "https://***"
 		}
-		return "***" // fallback for non-http/https URLs
+		return "***"
 	}
 
-	// API key prefixes
 	lowerValue := strings.ToLower(value)
 	if strings.HasPrefix(lowerValue, "sk_live_") || strings.HasPrefix(lowerValue, "sk_test_") {
 		return "sk_***"
@@ -72,7 +65,6 @@ func GeneratePlaceholder(_ string, value string) string {
 		return "ssh-***"
 	}
 
-	// Default placeholder
 	return "***"
 }
 
@@ -150,15 +142,14 @@ func isCommonNonSecret(key string) bool {
 
 	for _, nonSecret := range commonNonSecrets {
 		if keyUpper == nonSecret {
-			return true // This is a common non-secret
+			return true
 		}
 	}
 
-	return false // This is not in the list of common non-secrets
+	return false
 }
 
 func isBase64(s string) bool {
-	// Remove whitespace
 	s = strings.Map(func(r rune) rune {
 		if r == '\n' || r == ' ' || r == '\t' || r == '\r' {
 			return -1
@@ -166,12 +157,10 @@ func isBase64(s string) bool {
 		return r
 	}, s)
 
-	// Empty string or invalid length cannot be base64
 	if len(s) == 0 || len(s)%4 != 0 {
 		return false
 	}
 
-	// Try to decode as base64
 	_, err := base64.StdEncoding.DecodeString(s)
 	return err == nil
 }

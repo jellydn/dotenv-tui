@@ -27,13 +27,12 @@ type PickerFinishedMsg struct {
 func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
 	files, err := scanner.Scan(rootDir)
 	if err != nil {
-		// Return empty list if scan fails - we could handle this better in a real app
 		files = []string{}
 	}
 
 	selected := make(map[int]bool)
 	for i := range files {
-		selected[i] = true // Select all files by default
+		selected[i] = true
 	}
 
 	return func() tea.Msg {
@@ -83,7 +82,6 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected[m.cursor] = !m.selected[m.cursor]
 			}
 		case "a":
-			// Toggle select all
 			if len(m.files) > 0 {
 				allSelected := true
 				for i := range m.files {
@@ -97,7 +95,6 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "enter":
-			// Collect selected files (iterate in order to ensure deterministic output)
 			var selectedFiles []string
 			for i := 0; i < len(m.files); i++ {
 				if m.selected[i] {
@@ -111,7 +108,6 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "q", "esc":
-			// Let main handle the screen transition
 			return m, nil
 		case "ctrl+c":
 			return m, tea.Quit
@@ -138,7 +134,6 @@ func (m PickerModel) View() string {
 
 	var list string
 
-	// Show indicator if only one file found
 	if len(m.files) == 1 {
 		singleFileIndicator := lipgloss.NewStyle().
 			Faint(true).

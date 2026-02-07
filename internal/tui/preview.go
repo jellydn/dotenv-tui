@@ -34,7 +34,6 @@ type PreviewFinishedMsg struct {
 // NewPreviewModel creates a preview for the generated .env.example output.
 func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 	return func() tea.Msg {
-		// Read the original file
 		file, err := os.Open(filePath)
 		if err != nil {
 			return previewInitMsg{
@@ -46,7 +45,6 @@ func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 		}
 		defer func() { _ = file.Close() }()
 
-		// Parse the original file
 		originalEntries, err := parser.Parse(file)
 		if err != nil {
 			return previewInitMsg{
@@ -57,11 +55,8 @@ func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 			}
 		}
 
-		// Generate the .env.example entries
 		generatedEntries := generator.GenerateExample(originalEntries)
 
-		// Create diff lines - one line per entry (no +/- prefixes)
-		// Unchanged entries shown in green, masked entries shown in yellow
 		var diffLines []string
 		for i, orig := range originalEntries {
 			if i < len(generatedEntries) {
@@ -69,10 +64,8 @@ func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 				genLine := entryToString(generatedEntries[i])
 
 				if origLine == genLine {
-					// Unchanged line - show in green
 					diffLines = append(diffLines, fmt.Sprintf("  %s", origLine))
 				} else {
-					// Masked line - show placeholder in yellow with [masked] marker
 					diffLines = append(diffLines, fmt.Sprintf("  %s [masked]", genLine))
 				}
 			}
@@ -192,14 +185,12 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m PreviewModel) writeFile() error {
-	// Create the output file
 	file, err := os.Create(m.outputPath)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = file.Close() }()
 
-	// Write the generated entries
 	return parser.Write(file, m.generatedEntries)
 }
 
@@ -237,10 +228,8 @@ func (m PreviewModel) View() string {
 		return "\n" + title + "\n\n" + confirmMsg + "\n\n" + help + "\n"
 	}
 
-	// Show diff
 	var diff strings.Builder
 
-	// Calculate visible range
 	start := m.scrollOffset
 	end := start + visibleDiffLines
 	if end > len(m.diffLines) {
@@ -269,7 +258,6 @@ func (m PreviewModel) View() string {
 		diff.WriteString(style.Render(cursor+" "+line) + "\n")
 	}
 
-	// Scroll indicator
 	if len(m.diffLines) > visibleDiffLines {
 		scrollInfo := fmt.Sprintf("Line %d/%d", m.cursor+1, len(m.diffLines))
 		diff.WriteString(lipgloss.NewStyle().Faint(true).Render(scrollInfo) + "\n")
