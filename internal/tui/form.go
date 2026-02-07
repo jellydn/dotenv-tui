@@ -297,7 +297,7 @@ func (m FormModel) saveForm() tea.Cmd {
 			}
 		}
 
-		file, err := os.Create(outputPath)
+		file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
 			return FormFinishedMsg{Success: false, Error: fmt.Sprintf("Failed to create file: %v", err)}
 		}
