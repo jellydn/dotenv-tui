@@ -25,14 +25,27 @@ type PickerFinishedMsg struct {
 
 // NewPickerModel creates a file picker for selecting .env files.
 func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
-	files, err := scanner.Scan(rootDir)
+	var files []string
+	var err error
+
+	// Choose scanner based on mode
+	switch mode {
+	case GenerateExample:
+		files, err = scanner.Scan(rootDir)
+	case GenerateEnv:
+		files, err = scanner.ScanExamples(rootDir)
+	default:
+		files, err = scanner.Scan(rootDir)
+	}
+
 	if err != nil {
 		files = []string{}
 	}
 
+	// Initialize with no files selected by default
 	selected := make(map[int]bool)
 	for i := range files {
-		selected[i] = true
+		selected[i] = false
 	}
 
 	return func() tea.Msg {
@@ -101,12 +114,16 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					selectedFiles = append(selectedFiles, m.files[i])
 				}
 			}
-			return m, func() tea.Msg {
-				return PickerFinishedMsg{
-					Selected: selectedFiles,
-					Mode:     m.mode,
+			// Only proceed if at least one file is selected
+			if len(selectedFiles) > 0 {
+				return m, func() tea.Msg {
+					return PickerFinishedMsg{
+						Selected: selectedFiles,
+						Mode:     m.mode,
+					}
 				}
 			}
+			// If no files selected, do nothing
 		case "q", "esc":
 			return m, nil
 		case "ctrl+c":
@@ -118,26 +135,54 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the file picker UI.
 func (m PickerModel) View() string {
+	var titleText string
+	switch m.mode {
+	case GenerateExample:
+		titleText = "Select .env files"
+	case GenerateEnv:
+		titleText = "Select .env.example files"
+	default:
+		titleText = "Select .env files"
+	}
+
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#FAFAFA")).
 		Background(lipgloss.Color("#7D56F4")).
 		Padding(0, 1).
-		Render("Select .env files")
+		Render(titleText)
 
 	if len(m.files) == 0 {
+		var noFilesText string
+		switch m.mode {
+		case GenerateExample:
+			noFilesText = "No .env files found in current directory"
+		case GenerateEnv:
+			noFilesText = "No .env.example files found in current directory"
+		default:
+			noFilesText = "No .env files found in current directory"
+		}
 		noFiles := lipgloss.NewStyle().
 			Faint(true).
-			Render("No .env files found in current directory")
+			Render(noFilesText)
 		return "\n" + title + "\n\n" + noFiles + "\n\nPress q to return to menu"
 	}
 
 	var list string
 
 	if len(m.files) == 1 {
+		var fileType string
+		switch m.mode {
+		case GenerateExample:
+			fileType = ".env"
+		case GenerateEnv:
+			fileType = ".env.example"
+		default:
+			fileType = ".env"
+		}
 		singleFileIndicator := lipgloss.NewStyle().
 			Faint(true).
-			Render("(only 1 file found)")
+			Render("(only 1 " + fileType + " file found)")
 		list += singleFileIndicator + "\n\n"
 	}
 

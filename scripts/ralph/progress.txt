@@ -175,3 +175,20 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Linting requires removing unused fields and avoiding empty branches in Go
   - Bubble Tea models work well with message-based initialization for async operations
 ---
+
+## [2026-02-07 07:15] - US-011
+[Session: https://opncd.ai/s/placeholder]
+- Implemented ScanExamples function for .env.example file discovery with comprehensive unit tests
+- Added ScanExamples() function that returns only .env.example and .env.*.example files
+- ScanExamples skips the same dependency directories as the existing Scan function
+- Created isExampleFile() helper function to match .env.example and .env.*.example patterns
+- Comprehensive unit tests covering all acceptance criteria with temp directory structures
+- All existing Scan() behavior remains unchanged (still excludes .example files)
+- Files changed: internal/scanner/scanner.go, internal/scanner/scanner_test.go
+- **Learnings for future iterations:**
+  - When adding new scanning functions, reuse existing patterns like skipDirs map and directory traversal logic
+  - isExampleFile() function uses simple string prefix/suffix matching for .env.example patterns
+  - Table-driven tests with subtests work well for validating scanner behavior with temp directories
+  - Map lookup for skip directories is efficient and maintainable across multiple scan functions
+  - Use consistent error handling patterns across similar functions
+---
