@@ -20,11 +20,13 @@ type pickerItem struct {
 
 // PickerModel is the Bubble Tea model for selecting .env files.
 type PickerModel struct {
-	items    []pickerItem
-	selected map[int]bool // only applies to non-header items
-	cursor   int
-	mode     MenuChoice
-	rootDir  string
+	items        []pickerItem
+	selected     map[int]bool // only applies to non-header items
+	cursor       int
+	mode         MenuChoice
+	rootDir      string
+	windowHeight int
+	offset       int // scroll offset (first visible item index)
 }
 
 // PickerFinishedMsg signals file selection is complete.
@@ -113,9 +115,47 @@ type pickerInitMsg struct {
 	rootDir  string
 }
 
+// SetWindowHeight sets the terminal height for scroll calculations.
+func (m *PickerModel) SetWindowHeight(h int) {
+	m.windowHeight = h
+}
+
 // Init initializes the picker model.
 func (m PickerModel) Init() tea.Cmd {
 	return nil
+}
+
+const pickerOverheadLines = 6 // title + padding + help + surrounding newlines
+
+func (m PickerModel) visibleLines() int {
+	if m.windowHeight <= pickerOverheadLines {
+		return len(m.items)
+	}
+	maxVisible := m.windowHeight - pickerOverheadLines
+	if maxVisible > len(m.items) {
+		return len(m.items)
+	}
+	return maxVisible
+}
+
+func (m *PickerModel) ensureCursorVisible() {
+	visible := m.visibleLines()
+	if visible <= 0 {
+		return
+	}
+	if m.cursor < m.offset {
+		m.offset = m.cursor
+	}
+	if m.cursor >= m.offset+visible {
+		m.offset = m.cursor - visible + 1
+	}
+	maxOffset := len(m.items) - visible
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.offset > maxOffset {
+		m.offset = maxOffset
+	}
 }
 
 // findNextSelectableItem finds the next item in the given direction
@@ -140,6 +180,12 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.items) > 0 {
 			m.cursor = m.findNextSelectableItem(0, 1)
 		}
+		m.ensureCursorVisible()
+		return m, nil
+
+	case tea.WindowSizeMsg:
+		m.windowHeight = msg.Height
+		m.ensureCursorVisible()
 		return m, nil
 
 	case tea.KeyMsg:
@@ -148,11 +194,13 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > 0 {
 				newCursor := m.cursor - 1
 				m.cursor = m.findNextSelectableItem(newCursor, -1)
+				m.ensureCursorVisible()
 			}
 		case "down", "j":
 			if m.cursor < len(m.items)-1 {
 				newCursor := m.cursor + 1
 				m.cursor = m.findNextSelectableItem(newCursor, 1)
+				m.ensureCursorVisible()
 			}
 		case " ":
 			if len(m.items) > 0 && !m.items[m.cursor].isHeader {
@@ -242,7 +290,20 @@ func (m PickerModel) View() string {
 		list += singleFileIndicator + "\n\n"
 	}
 
-	for i, item := range m.items {
+	visible := m.visibleLines()
+	end := m.offset + visible
+	if end > len(m.items) {
+		end = len(m.items)
+	}
+
+	faintStyle := lipgloss.NewStyle().Faint(true)
+
+	if m.offset > 0 {
+		list += faintStyle.Render("  ↑ more items above") + "\n"
+	}
+
+	for i := m.offset; i < end; i++ {
+		item := m.items[i]
 		if item.isHeader {
 			headerStyle := lipgloss.NewStyle().
 				Bold(true).
@@ -267,6 +328,10 @@ func (m PickerModel) View() string {
 
 			list += style.Render(cursor+" "+checkbox+" "+item.text) + "\n"
 		}
+	}
+
+	if end < len(m.items) {
+		list += faintStyle.Render("  ↓ more items below") + "\n"
 	}
 
 	help := lipgloss.NewStyle().

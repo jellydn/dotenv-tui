@@ -45,6 +45,7 @@ type model struct {
 	fileList      []string
 	fileIndex     int
 	pickerMode    tui.MenuChoice
+	windowHeight  int
 }
 
 type screen int
@@ -70,6 +71,10 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if wsm, ok := msg.(tea.WindowSizeMsg); ok {
+		m.windowHeight = wsm.Height
+	}
+
 	switch m.currentScreen {
 	case menuScreen:
 		return updateMenu(msg, m)
@@ -95,6 +100,7 @@ func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "enter" || keyMsg.String() == " " {
 			m.currentScreen = pickerScreen
+			m.picker.SetWindowHeight(m.windowHeight)
 			return m, tui.NewPickerModel(m.menu.Choice(), ".")
 		}
 	}
