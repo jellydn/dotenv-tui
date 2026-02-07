@@ -91,10 +91,6 @@ API_URL=https://api.example.com
 
 			for i, entry := range entries {
 				expected := tt.expected[i]
-				if entry.Type() != expected.Type() {
-					t.Errorf("Entry %d type = %v, expected %v", i, entry.Type(), expected.Type())
-					continue
-				}
 
 				switch e := entry.(type) {
 				case KeyValue:

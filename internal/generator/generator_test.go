@@ -3,8 +3,8 @@ package generator
 import (
 	"testing"
 
-	"dotenv-tui/internal/detector"
-	"dotenv-tui/internal/parser"
+	"github.com/jellydn/env-man/internal/detector"
+	"github.com/jellydn/env-man/internal/parser"
 )
 
 func TestGenerateExample(t *testing.T) {
@@ -150,112 +150,6 @@ func TestGenerateExample(t *testing.T) {
 	}
 }
 
-func TestGenerateEnv(t *testing.T) {
-	tests := []struct {
-		name     string
-		entries  []parser.Entry
-		expected []parser.Entry
-	}{
-		{
-			name: "copy all entries as-is",
-			entries: []parser.Entry{
-				parser.Comment{Text: "# App configuration"},
-				parser.KeyValue{Key: "APP_NAME", Value: "myapp"},
-				parser.BlankLine{},
-				parser.KeyValue{Key: "API_ENDPOINT", Value: "https://api.example.com", Quoted: "\""},
-				parser.KeyValue{Key: "DEBUG", Value: "true", Exported: true},
-			},
-			expected: []parser.Entry{
-				parser.Comment{Text: "# App configuration"},
-				parser.KeyValue{Key: "APP_NAME", Value: "myapp"},
-				parser.BlankLine{},
-				parser.KeyValue{Key: "API_ENDPOINT", Value: "https://api.example.com", Quoted: "\""},
-				parser.KeyValue{Key: "DEBUG", Value: "true", Exported: true},
-			},
-		},
-		{
-			name:     "empty entries list",
-			entries:  []parser.Entry{},
-			expected: []parser.Entry{},
-		},
-		{
-			name: "only comments and blank lines",
-			entries: []parser.Entry{
-				parser.Comment{Text: "# First comment"},
-				parser.BlankLine{},
-				parser.Comment{Text: "# Second comment"},
-			},
-			expected: []parser.Entry{
-				parser.Comment{Text: "# First comment"},
-				parser.BlankLine{},
-				parser.Comment{Text: "# Second comment"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateEnv(tt.entries)
-
-			if len(result) != len(tt.expected) {
-				t.Errorf("Expected %d entries, got %d", len(tt.expected), len(result))
-				return
-			}
-
-			for i, expectedEntry := range tt.expected {
-				resultEntry := result[i]
-
-				// Since this is a copy function, the entries should be identical
-				if resultEntry.Type() != expectedEntry.Type() {
-					t.Errorf("Expected entry type %s at index %d, got %s", expectedEntry.Type(), i, resultEntry.Type())
-					continue
-				}
-
-				switch expected := expectedEntry.(type) {
-				case parser.KeyValue:
-					resultKV, ok := resultEntry.(parser.KeyValue)
-					if !ok {
-						t.Errorf("Expected KeyValue at index %d, got %T", i, resultEntry)
-						continue
-					}
-
-					if resultKV.Key != expected.Key {
-						t.Errorf("Expected key %q at index %d, got %q", expected.Key, i, resultKV.Key)
-					}
-
-					if resultKV.Value != expected.Value {
-						t.Errorf("Expected value %q for key %q at index %d, got %q", expected.Value, expected.Key, i, resultKV.Value)
-					}
-
-					if resultKV.Quoted != expected.Quoted {
-						t.Errorf("Expected quoted %q for key %q at index %d, got %q", expected.Quoted, expected.Key, i, resultKV.Quoted)
-					}
-
-					if resultKV.Exported != expected.Exported {
-						t.Errorf("Expected exported %t for key %q at index %d, got %t", expected.Exported, expected.Key, i, resultKV.Exported)
-					}
-
-				case parser.Comment:
-					resultComment, ok := resultEntry.(parser.Comment)
-					if !ok {
-						t.Errorf("Expected Comment at index %d, got %T", i, resultEntry)
-						continue
-					}
-
-					if resultComment.Text != expected.Text {
-						t.Errorf("Expected comment text %q at index %d, got %q", expected.Text, i, resultComment.Text)
-					}
-
-				case parser.BlankLine:
-					if _, ok := resultEntry.(parser.BlankLine); !ok {
-						t.Errorf("Expected BlankLine at index %d, got %T", i, resultEntry)
-					}
-				}
-			}
-		})
-	}
-}
-
 // Integration test with detector package
 func TestGenerateExampleIntegration(t *testing.T) {
 	// Test that GenerateExample correctly uses detector.IsSecret and detector.GeneratePlaceholder
@@ -337,18 +231,5 @@ func BenchmarkGenerateExample(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		GenerateExample(entries)
-	}
-}
-
-func BenchmarkGenerateEnv(b *testing.B) {
-	// Create a large sample of entries
-	var entries []parser.Entry
-	for i := 0; i < 1000; i++ {
-		entries = append(entries, parser.KeyValue{Key: "VAR_" + string(rune(i)), Value: "value"})
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		GenerateEnv(entries)
 	}
 }

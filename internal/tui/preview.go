@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"dotenv-tui/internal/generator"
-	"dotenv-tui/internal/parser"
+	"github.com/jellydn/env-man/internal/generator"
+	"github.com/jellydn/env-man/internal/parser"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -119,6 +119,16 @@ func (m PreviewModel) Init() tea.Cmd {
 	return nil
 }
 
+const visibleDiffLines = 10
+
+func (m *PreviewModel) adjustScroll() {
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	} else if m.cursor >= m.scrollOffset+visibleDiffLines {
+		m.scrollOffset = m.cursor - visibleDiffLines + 1
+	}
+}
+
 func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case previewInitMsg:
@@ -139,16 +149,13 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if m.confirmed {
 			switch msg.String() {
 			case "y", "Y", "enter":
-				// Write the file
 				if err := m.writeFile(); err != nil {
-					// Handle error - for now just show failure
 					m.success = false
 					return m, nil
 				}
 				m.success = true
 				return m, nil
 			case "n", "N", "q", "esc":
-				// Cancel and go back
 				return m, func() tea.Msg {
 					return PreviewFinishedMsg{Success: false}
 				}
@@ -158,18 +165,12 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "up", "k":
 				if m.cursor > 0 {
 					m.cursor--
-					if m.cursor < m.scrollOffset {
-						m.scrollOffset = m.cursor
-					}
+					m.adjustScroll()
 				}
 			case "down", "j":
 				if m.cursor < len(m.diffLines)-1 {
 					m.cursor++
-					// Auto-scroll when cursor reaches bottom
-					visibleLines := 10 // Approximate visible lines
-					if m.cursor >= m.scrollOffset+visibleLines {
-						m.scrollOffset = m.cursor - visibleLines + 1
-					}
+					m.adjustScroll()
 				}
 			case "enter":
 				m.confirmed = true
@@ -232,9 +233,8 @@ func (m PreviewModel) View() string {
 	var diff strings.Builder
 
 	// Calculate visible range
-	visibleLines := 10
 	start := m.scrollOffset
-	end := start + visibleLines
+	end := start + visibleDiffLines
 	if end > len(m.diffLines) {
 		end = len(m.diffLines)
 	}
@@ -249,13 +249,10 @@ func (m PreviewModel) View() string {
 		// Apply colors based on line type
 		style := lipgloss.NewStyle()
 		if strings.HasPrefix(line, "- ") {
-			// Removed line - red
 			style = style.Foreground(lipgloss.Color("#FF6B6B"))
 		} else if strings.HasPrefix(line, "+ ") {
-			// Added line - green
 			style = style.Foreground(lipgloss.Color("#00FF00"))
 		} else {
-			// Unchanged line - green (kept)
 			style = style.Foreground(lipgloss.Color("#00FF00"))
 		}
 
@@ -267,7 +264,7 @@ func (m PreviewModel) View() string {
 	}
 
 	// Scroll indicator
-	if len(m.diffLines) > visibleLines {
+	if len(m.diffLines) > visibleDiffLines {
 		scrollInfo := fmt.Sprintf("Line %d/%d", m.cursor+1, len(m.diffLines))
 		diff.WriteString(lipgloss.NewStyle().Faint(true).Render(scrollInfo) + "\n")
 	}

@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"dotenv-tui/internal/generator"
-	"dotenv-tui/internal/parser"
-	"dotenv-tui/internal/scanner"
-	"dotenv-tui/internal/tui"
+	"github.com/jellydn/env-man/internal/generator"
+	"github.com/jellydn/env-man/internal/parser"
+	"github.com/jellydn/env-man/internal/scanner"
+	"github.com/jellydn/env-man/internal/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -293,9 +293,6 @@ func generateEnvFile(inputPath string) error {
 		return fmt.Errorf("failed to parse .env.example file: %w", err)
 	}
 
-	// Generate env entries (copy)
-	envEntries := generator.GenerateEnv(entries)
-
 	// Determine output path
 	outputPath := filepath.Join(filepath.Dir(inputPath), ".env")
 
@@ -306,7 +303,7 @@ func generateEnvFile(inputPath string) error {
 	}
 	defer func() { _ = outFile.Close() }()
 
-	if err := parser.Write(outFile, envEntries); err != nil {
+	if err := parser.Write(outFile, entries); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 

@@ -1,8 +1,8 @@
 package generator
 
 import (
-	"dotenv-tui/internal/detector"
-	"dotenv-tui/internal/parser"
+	"github.com/jellydn/env-man/internal/detector"
+	"github.com/jellydn/env-man/internal/parser"
 )
 
 // GenerateExample creates a .env.example from .env entries by masking secrets
@@ -43,10 +43,4 @@ func GenerateExample(entries []parser.Entry) []parser.Entry {
 	}
 
 	return result
-}
-
-// GenerateEnv creates a .env from .env.example entries by copying them
-// This is for non-interactive mode where we just copy entries as-is
-func GenerateEnv(entries []parser.Entry) []parser.Entry {
-	return append([]parser.Entry(nil), entries...)
 }

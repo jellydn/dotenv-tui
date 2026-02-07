@@ -63,7 +63,7 @@ just fmt
 
 - Group imports: standard library, then third-party, then local packages
 - Use `goimports` for automatic import management
-- Local imports use module prefix: `dotenv-tui/internal/parser`
+- Local imports use module prefix: `github.com/jellydn/env-man/internal/parser`
 
 ```go
 import (
@@ -75,7 +75,7 @@ import (
     tea "github.com/charmbracelet/bubbletea"
     "github.com/charmbracelet/lipgloss"
 
-    "dotenv-tui/internal/parser"
+    "github.com/jellydn/env-man/internal/parser"
 )
 ```
 

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"dotenv-tui/internal/parser"
+	"github.com/jellydn/env-man/internal/parser"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

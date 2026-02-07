@@ -74,11 +74,7 @@ func isEnvFile(fileName string) bool {
 		return false
 	}
 
-	// Check for .env prefix
-	if strings.HasPrefix(fileName, ".env") {
-		// .env alone or .env.* variants
-		return fileName == ".env" || len(fileName) > 4 && fileName[4] == '.'
-	}
-
-	return false
+	// Match .env or .env.* (but not .env alone without extension)
+	// .env, .env.local, .env.production, etc.
+	return strings.HasPrefix(fileName, ".env") && (fileName == ".env" || (len(fileName) > 4 && fileName[4] == '.'))
 }

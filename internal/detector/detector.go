@@ -138,19 +138,16 @@ func isCommonNonSecret(key string) bool {
 }
 
 func isBase64(s string) bool {
-	// Remove any whitespace
-	s = strings.ReplaceAll(s, "\n", "")
-	s = strings.ReplaceAll(s, " ", "")
-	s = strings.ReplaceAll(s, "\t", "")
-	s = strings.ReplaceAll(s, "\r", "")
+	// Remove whitespace
+	s = strings.Map(func(r rune) rune {
+		if r == '\n' || r == ' ' || r == '\t' || r == '\r' {
+			return -1
+		}
+		return r
+	}, s)
 
-	// Empty string cannot be base64
-	if len(s) == 0 {
-		return false
-	}
-
-	// Check if the string length is a multiple of 4
-	if len(s)%4 != 0 {
+	// Empty string or invalid length cannot be base64
+	if len(s) == 0 || len(s)%4 != 0 {
 		return false
 	}
 

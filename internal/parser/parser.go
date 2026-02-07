@@ -8,10 +8,7 @@ import (
 )
 
 // Entry represents a line in a .env file
-type Entry interface {
-	// Type returns the entry type
-	Type() string
-}
+type Entry interface{}
 
 // KeyValue represents a KEY=VALUE entry
 type KeyValue struct {
@@ -21,19 +18,13 @@ type KeyValue struct {
 	Exported bool   // true if prefixed with 'export'
 }
 
-func (kv KeyValue) Type() string { return "KeyValue" }
-
 // Comment represents a comment line
 type Comment struct {
 	Text string
 }
 
-func (c Comment) Type() string { return "Comment" }
-
 // BlankLine represents an empty line
 type BlankLine struct{}
-
-func (b BlankLine) Type() string { return "BlankLine" }
 
 // Parse reads a .env file and returns ordered entries
 func Parse(reader io.Reader) ([]Entry, error) {

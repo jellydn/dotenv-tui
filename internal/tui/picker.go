@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"dotenv-tui/internal/scanner"
+	"github.com/jellydn/env-man/internal/scanner"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"

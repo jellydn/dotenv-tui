@@ -1,4 +1,4 @@
-module dotenv-tui
+module github.com/jellydn/env-man
 
 go 1.25.6
 

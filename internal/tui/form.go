@@ -6,8 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"dotenv-tui/internal/generator"
-	"dotenv-tui/internal/parser"
+	"github.com/jellydn/env-man/internal/parser"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -63,7 +62,7 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 		}
 
 		// Generate initial entries to get proper structure
-		generated := generator.GenerateEnv(entries)
+		generated := entries
 
 		var fields []FormField
 		for _, entry := range generated {
@@ -106,42 +105,58 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 
 func isPlaceholderValue(value string) bool {
 	lower := strings.ToLower(value)
-	return strings.Contains(lower, "your_") ||
-		strings.Contains(lower, "_here") ||
-		strings.Contains(lower, "placeholder") ||
-		(strings.Contains(lower, "example") && !strings.Contains(lower, "://")) ||
-		value == "***" ||
-		strings.HasPrefix(value, "sk_") && strings.HasSuffix(value, "***") ||
-		strings.HasPrefix(value, "ghp_") && strings.HasSuffix(value, "***") ||
-		strings.HasPrefix(value, "eyJ") && strings.HasSuffix(value, "***")
+	placeholderPatterns := []string{"your_", "_here", "placeholder"}
+	for _, pattern := range placeholderPatterns {
+		if strings.Contains(lower, pattern) {
+			return true
+		}
+	}
+
+	// Example without URLs
+	if strings.Contains(lower, "example") && !strings.Contains(lower, "://") {
+		return true
+	}
+
+	// Generic and format-specific placeholders
+	if value == "***" {
+		return true
+	}
+
+	// Prefix-based placeholders
+	placeholderPrefixes := []string{"sk_", "ghp_", "eyJ"}
+	for _, prefix := range placeholderPrefixes {
+		if strings.HasPrefix(value, prefix) && strings.HasSuffix(value, "***") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func generateHint(key, value string) string {
 	lowerKey := strings.ToLower(key)
 
-	if strings.Contains(lowerKey, "api") && strings.Contains(lowerKey, "key") {
-		return "Enter your API key"
+	// Map patterns to hints
+	hintMap := []struct {
+		patterns []string
+		hint     string
+	}{
+		{[]string{"api", "key"}, "Enter your API key"},
+		{[]string{"secret"}, "Enter your secret"},
+		{[]string{"token"}, "Enter your token"},
+		{[]string{"password", "pass"}, "Enter your password"},
+		{[]string{"url", "uri"}, "Enter URL (e.g., https://example.com)"},
+		{[]string{"port"}, "Enter port number (e.g., 3000)"},
+		{[]string{"host"}, "Enter host (e.g., localhost)"},
+		{[]string{"database", "db"}, "Enter database connection string"},
 	}
-	if strings.Contains(lowerKey, "secret") {
-		return "Enter your secret"
-	}
-	if strings.Contains(lowerKey, "token") {
-		return "Enter your token"
-	}
-	if strings.Contains(lowerKey, "password") || strings.Contains(lowerKey, "pass") {
-		return "Enter your password"
-	}
-	if strings.Contains(lowerKey, "url") || strings.Contains(lowerKey, "uri") {
-		return "Enter URL (e.g., https://example.com)"
-	}
-	if strings.Contains(lowerKey, "port") {
-		return "Enter port number (e.g., 3000)"
-	}
-	if strings.Contains(lowerKey, "host") {
-		return "Enter host (e.g., localhost)"
-	}
-	if strings.Contains(lowerKey, "database") || strings.Contains(lowerKey, "db") {
-		return "Enter database connection string"
+
+	for _, entry := range hintMap {
+		for _, pattern := range entry.patterns {
+			if strings.Contains(lowerKey, pattern) {
+				return entry.hint
+			}
+		}
 	}
 
 	return "Enter value for " + key
@@ -149,6 +164,22 @@ func generateHint(key, value string) string {
 
 func (m FormModel) Init() tea.Cmd {
 	return nil
+}
+
+// moveCursor moves the cursor and updates scroll position
+const visibleFields = 7
+
+func (m *FormModel) moveCursor(newCursor int) {
+	m.fields[m.cursor].Input.Blur()
+	m.cursor = newCursor
+	m.fields[m.cursor].Input.Focus()
+
+	// Adjust scroll to keep cursor visible
+	if m.cursor < m.scroll {
+		m.scroll = m.cursor
+	} else if m.cursor >= m.scroll+visibleFields {
+		m.scroll = m.cursor - visibleFields + 1
+	}
 }
 
 func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -174,40 +205,19 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "up", "k":
 			if m.cursor > 0 {
-				m.fields[m.cursor].Input.Blur()
-				m.cursor--
-				m.fields[m.cursor].Input.Focus()
-				if m.scroll > m.cursor {
-					m.scroll = m.cursor
-				}
+				m.moveCursor(m.cursor - 1)
 			}
 		case "down", "j":
 			if m.cursor < len(m.fields)-1 {
-				m.fields[m.cursor].Input.Blur()
-				m.cursor++
-				m.fields[m.cursor].Input.Focus()
-				// Auto-scroll if cursor goes below visible area
-				if m.cursor >= m.scroll+7 {
-					m.scroll = m.cursor - 6
-				}
+				m.moveCursor(m.cursor + 1)
 			}
 		case "tab":
 			if m.cursor < len(m.fields)-1 {
-				m.fields[m.cursor].Input.Blur()
-				m.cursor++
-				m.fields[m.cursor].Input.Focus()
-				if m.cursor >= m.scroll+7 {
-					m.scroll = m.cursor - 6
-				}
+				m.moveCursor(m.cursor + 1)
 			}
 		case "shift+tab":
 			if m.cursor > 0 {
-				m.fields[m.cursor].Input.Blur()
-				m.cursor--
-				m.fields[m.cursor].Input.Focus()
-				if m.scroll > m.cursor {
-					m.scroll = m.cursor
-				}
+				m.moveCursor(m.cursor - 1)
 			}
 		case "ctrl+s":
 			return m, m.saveForm()
@@ -215,14 +225,10 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor == len(m.fields)-1 {
 				// Enter on last field submits
 				return m, m.saveForm()
-			} else {
-				// Otherwise move to next field
-				m.fields[m.cursor].Input.Blur()
-				m.cursor++
-				m.fields[m.cursor].Input.Focus()
-				if m.cursor >= m.scroll+7 {
-					m.scroll = m.cursor - 6
-				}
+			}
+			// Otherwise move to next field
+			if m.cursor < len(m.fields)-1 {
+				m.moveCursor(m.cursor + 1)
 			}
 		case "q", "esc":
 			return m, func() tea.Msg {
@@ -332,7 +338,7 @@ func (m FormModel) View() string {
 
 	// Calculate visible area
 	visibleStart := m.scroll
-	visibleEnd := m.scroll + 7
+	visibleEnd := m.scroll + visibleFields
 	if visibleEnd > len(m.fields) {
 		visibleEnd = len(m.fields)
 	}
@@ -367,7 +373,7 @@ func (m FormModel) View() string {
 	}
 
 	// Scroll indicator
-	if len(m.fields) > 7 {
+	if len(m.fields) > visibleFields {
 		scrollInfo := lipgloss.NewStyle().
 			Faint(true).
 			Render(fmt.Sprintf("Showing %d-%d of %d fields", visibleStart+1, visibleEnd, len(m.fields)))
