@@ -319,3 +319,21 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Test interactive prompts using echo with piped input for automated testing
   - When using defer for file closure, ensure it's placed after the file exists check
 ---
+
+## [2026-02-07 00:29] - US-019
+[Session: https://opncd.ai/s/placeholder]
+- Implemented summary output after completion for --yolo flag
+- Added generated and skipped counters to track file processing status
+- Added summary line 'Done: N generated, M skipped' after all files are processed
+- Incremented generated counter when files are successfully created/overwritten
+- Incremented skipped counter when user declines to overwrite existing files
+- Verified summary works correctly for all scenarios: fresh generation, skip, and force
+- Files changed: main.go, scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - Use integer counters with var declaration for tracking operation counts
+  - Increment counters in the appropriate code paths (after success vs when skipping)
+  - Summary output should be printed after processing all files, not per file
+  - Test all scenarios: no existing files, user skips, and force overwrite
+  - Summary format 'Done: N generated, M skipped' provides clear at-a-glance status
+  - Always exit with code 0 for successful operations (including when all files are skipped)
+---

@@ -458,6 +458,9 @@ func generateAllEnvFiles(force bool) error {
 		fmt.Printf("  %s\n", file)
 	}
 
+	// Track counts for summary
+	var generated, skipped int
+
 	// Generate .env files from each .env.example file
 	for _, exampleFile := range exampleFiles {
 		outputPath := exampleFile[:len(exampleFile)-len(".example")]
@@ -482,6 +485,7 @@ func generateAllEnvFiles(force bool) error {
 
 			if response != "y" && response != "Y" {
 				fmt.Printf("Skipped %s\n", outputPath)
+				skipped++
 				continue
 			}
 		}
@@ -497,7 +501,10 @@ func generateAllEnvFiles(force bool) error {
 		}
 
 		fmt.Printf("Generated %s\n", outputPath)
+		generated++
 	}
 
+	// Print summary
+	fmt.Printf("Done: %d generated, %d skipped\n", generated, skipped)
 	return nil
 }
