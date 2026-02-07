@@ -95,7 +95,7 @@ verify_checksum() {
         return 0
     fi
     
-    EXPECTED=$(cat "$CHECKSUM_FILE" | awk '{print $1}')
+    EXPECTED=$(awk '{print $1}' < "$CHECKSUM_FILE")
     ACTUAL=$(sha256sum "$BINARY_FILE" | awk '{print $1}')
     
     if [ "$EXPECTED" != "$ACTUAL" ]; then
@@ -130,7 +130,7 @@ main() {
     
     # Create temporary directory
     TMP_DIR=$(mktemp -d)
-    trap "rm -rf $TMP_DIR" EXIT
+    trap 'rm -rf "$TMP_DIR"' EXIT
     
     info "Downloading binary..."
     download "$DOWNLOAD_URL" "$TMP_DIR/$BINARY_FILENAME"
