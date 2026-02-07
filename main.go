@@ -14,6 +14,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// Version is set at build time via ldflags
+var Version = "dev"
+
 type model struct {
 	currentScreen screen
 	menu          tui.MenuModel
@@ -177,11 +180,17 @@ func main() {
 		generateExample = flag.String("generate-example", "", "Generate .env.example from specified .env file")
 		generateEnv     = flag.String("generate-env", "", "Generate .env from specified .env.example file")
 		showHelp        = flag.Bool("help", false, "Show help information")
+		showVersion     = flag.Bool("version", false, "Show version information")
 		scanFlag        = flag.Bool("scan", false, "Scan directory for .env files")
 		forceFlag       = flag.Bool("force", false, "Force overwrite existing files")
 	)
 
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("dotenv-tui version %s\n", Version)
+		return
+	}
 
 	if *showHelp {
 		showUsage()
@@ -237,6 +246,7 @@ FLAGS:
     --generate-env <path>        Generate .env from specified .env.example file
     --scan [directory]           List discovered .env files (default: current directory)
     --force                      Force overwrite existing files
+    --version                    Show version information
     --help                       Show this help message
 
 EXAMPLES:
