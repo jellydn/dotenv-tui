@@ -1,8 +1,8 @@
 package generator
 
 import (
-	"github.com/jellydn/env-man/internal/detector"
-	"github.com/jellydn/env-man/internal/parser"
+	"github.com/jellydn/dotenv-tui/internal/detector"
+	"github.com/jellydn/dotenv-tui/internal/parser"
 )
 
 // GenerateExample creates a .env.example from .env entries by masking secrets

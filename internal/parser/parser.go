@@ -30,9 +30,13 @@ type BlankLine struct{}
 func Parse(reader io.Reader) ([]Entry, error) {
 	var entries []Entry
 	scanner := bufio.NewScanner(reader)
+	// Increase buffer to 1MB to handle large values
+	scanner.Buffer(make([]byte, 1024), 1024*1024)
 
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+		line := scanner.Text()
+		// Trim only trailing whitespace, preserve leading whitespace
+		line = strings.TrimRight(line, " \t\r\n")
 
 		// Skip empty lines (but preserve as BlankLine)
 		if line == "" {

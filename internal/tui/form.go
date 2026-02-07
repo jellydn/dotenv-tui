@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jellydn/env-man/internal/parser"
+	"github.com/jellydn/dotenv-tui/internal/parser"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,13 +22,14 @@ type FormField struct {
 }
 
 type FormModel struct {
-	fields     []FormField
-	cursor     int
-	scroll     int
-	filePath   string
-	confirmed  bool
-	errorMsg   string
-	successMsg string
+	fields          []FormField
+	originalEntries []parser.Entry
+	cursor          int
+	scroll          int
+	filePath        string
+	confirmed       bool
+	errorMsg        string
+	successMsg      string
 }
 
 type FormFinishedMsg struct {
@@ -37,8 +38,9 @@ type FormFinishedMsg struct {
 }
 
 type formInitMsg struct {
-	fields   []FormField
-	filePath string
+	fields          []FormField
+	originalEntries []parser.Entry
+	filePath        string
 }
 
 func NewFormModel(exampleFilePath string) tea.Cmd {
@@ -97,13 +99,19 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 		}
 
 		return formInitMsg{
-			fields:   fields,
-			filePath: exampleFilePath,
+			fields:          fields,
+			originalEntries: entries,
+			filePath:        exampleFilePath,
 		}
 	}
 }
 
 func isPlaceholderValue(value string) bool {
+	// Any value ending with *** is a placeholder (covers all generator outputs)
+	if strings.HasSuffix(value, "***") {
+		return true
+	}
+
 	lower := strings.ToLower(value)
 	placeholderPatterns := []string{"your_", "_here", "placeholder"}
 	for _, pattern := range placeholderPatterns {
@@ -115,19 +123,6 @@ func isPlaceholderValue(value string) bool {
 	// Example without URLs
 	if strings.Contains(lower, "example") && !strings.Contains(lower, "://") {
 		return true
-	}
-
-	// Generic and format-specific placeholders
-	if value == "***" {
-		return true
-	}
-
-	// Prefix-based placeholders
-	placeholderPrefixes := []string{"sk_", "ghp_", "eyJ"}
-	for _, prefix := range placeholderPrefixes {
-		if strings.HasPrefix(value, prefix) && strings.HasSuffix(value, "***") {
-			return true
-		}
 	}
 
 	return false
@@ -186,6 +181,7 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case formInitMsg:
 		m.fields = msg.fields
+		m.originalEntries = msg.originalEntries
 		m.filePath = msg.filePath
 
 		// Set focus on first field if there are any
@@ -194,10 +190,26 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case FormFinishedMsg:
+		m.confirmed = true
+		if msg.Success {
+			outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
+			m.successMsg = fmt.Sprintf("Successfully wrote %s", outputPath)
+			m.errorMsg = ""
+		} else {
+			m.errorMsg = msg.Error
+			m.successMsg = ""
+		}
+		return m, nil
+
 	case tea.KeyMsg:
 		if m.confirmed {
-			if msg.String() == "q" || msg.String() == "esc" {
-				return m, tea.Quit
+			switch msg.String() {
+			case "q", "esc", "enter":
+				// Only emit done message after user views result
+				return m, func() tea.Msg {
+					return FormFinishedMsg{Success: m.errorMsg == "", Error: m.errorMsg}
+				}
 			}
 			return m, nil
 		}
@@ -252,17 +264,28 @@ func (m FormModel) saveForm() tea.Cmd {
 		// Determine output file path (.env)
 		outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
 
-		// Create entries from form data
+		// Walk original entries and update only KeyValue.Value from form inputs
+		// Preserve comments, blank lines, quotes, and export prefix
+		fieldIndex := 0
 		var entries []parser.Entry
-		for _, field := range m.fields {
-			value := field.Input.Value()
-			if value == "" {
-				value = field.Input.Placeholder
+		for _, entry := range m.originalEntries {
+			switch e := entry.(type) {
+			case parser.KeyValue:
+				if fieldIndex < len(m.fields) {
+					newValue := m.fields[fieldIndex].Input.Value()
+					entries = append(entries, parser.KeyValue{
+						Key:      e.Key,
+						Value:    newValue,
+						Quoted:   e.Quoted,
+						Exported: e.Exported,
+					})
+					fieldIndex++
+				}
+			case parser.Comment:
+				entries = append(entries, e)
+			case parser.BlankLine:
+				entries = append(entries, e)
 			}
-			entries = append(entries, parser.KeyValue{
-				Key:   field.Key,
-				Value: value,
-			})
 		}
 
 		// Write to file
@@ -294,7 +317,7 @@ func (m FormModel) View() string {
 
 			help := lipgloss.NewStyle().
 				Faint(true).
-				Render("Press q to quit")
+				Render("Press Enter or q to continue")
 
 			return fmt.Sprintf(
 				"\n%s\n\n%s\n\n%s\n",
@@ -315,7 +338,7 @@ func (m FormModel) View() string {
 
 		help := lipgloss.NewStyle().
 			Faint(true).
-			Render("Press q to quit")
+			Render("Press Enter or q to continue")
 
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n",

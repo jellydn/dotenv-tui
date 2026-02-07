@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/jellydn/env-man/internal/scanner"
+	"github.com/jellydn/dotenv-tui/internal/scanner"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -77,10 +77,10 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected[m.cursor] = !m.selected[m.cursor]
 			}
 		case "enter":
-			// Collect selected files
+			// Collect selected files (iterate in order to ensure deterministic output)
 			var selectedFiles []string
-			for i, selected := range m.selected {
-				if selected {
+			for i := 0; i < len(m.files); i++ {
+				if m.selected[i] {
 					selectedFiles = append(selectedFiles, m.files[i])
 				}
 			}

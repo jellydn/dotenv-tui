@@ -33,13 +33,13 @@ dotenv-tui fixes this with two commands:
 ## Install
 
 ```sh
-go install github.com/jellydn/env-man@latest
+go install github.com/jellydn/dotenv-tui@latest
 ```
 
 Or build from source:
 
 ```sh
-git clone https://github.com/jellydn/env-man.git && cd env-man
+git clone https://github.com/jellydn/dotenv-tui.git && cd dotenv-tui
 just build
 ```
 

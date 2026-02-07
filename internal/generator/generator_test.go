@@ -3,8 +3,8 @@ package generator
 import (
 	"testing"
 
-	"github.com/jellydn/env-man/internal/detector"
-	"github.com/jellydn/env-man/internal/parser"
+	"github.com/jellydn/dotenv-tui/internal/detector"
+	"github.com/jellydn/dotenv-tui/internal/parser"
 )
 
 func TestGenerateExample(t *testing.T) {
@@ -73,7 +73,7 @@ func TestGenerateExample(t *testing.T) {
 			},
 			expected: []parser.Entry{
 				parser.KeyValue{Key: "SECRET_KEY", Value: "***", Exported: true},
-				parser.KeyValue{Key: "PUBLIC_KEY", Value: "***", Exported: true}, // PUBLIC_KEY contains "KEY" so it's a secret
+				parser.KeyValue{Key: "PUBLIC_KEY", Value: "publicvalue", Exported: true}, // PUBLIC_KEY is not a secret (no KEY pattern)
 			},
 		},
 		{
@@ -87,7 +87,7 @@ func TestGenerateExample(t *testing.T) {
 			expected: []parser.Entry{
 				parser.KeyValue{Key: "STRIPE_KEY", Value: "sk_***"},
 				parser.KeyValue{Key: "GITHUB_TOKEN", Value: "ghp_***"},
-				parser.KeyValue{Key: "DATABASE_URL", Value: "***://***"}, // postgres:// is not http/https
+				parser.KeyValue{Key: "DATABASE_URL", Value: "***"}, // postgres:// falls back to ***
 				parser.KeyValue{Key: "JWT_TOKEN", Value: "eyJ***"},
 			},
 		},

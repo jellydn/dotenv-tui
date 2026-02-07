@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jellydn/env-man/internal/generator"
-	"github.com/jellydn/env-man/internal/parser"
+	"github.com/jellydn/dotenv-tui/internal/generator"
+	"github.com/jellydn/dotenv-tui/internal/parser"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -56,7 +56,8 @@ func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 		// Generate the .env.example entries
 		generatedEntries := generator.GenerateExample(originalEntries)
 
-		// Create diff lines
+		// Create diff lines - one line per entry (no +/- prefixes)
+		// Unchanged entries shown in green, masked entries shown in yellow
 		var diffLines []string
 		for i, orig := range originalEntries {
 			if i < len(generatedEntries) {
@@ -67,9 +68,8 @@ func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 					// Unchanged line - show in green
 					diffLines = append(diffLines, fmt.Sprintf("  %s", origLine))
 				} else {
-					// Changed line - show old → new in yellow
-					diffLines = append(diffLines, fmt.Sprintf("- %s", origLine))
-					diffLines = append(diffLines, fmt.Sprintf("+ %s", genLine))
+					// Masked line - show placeholder in yellow with [masked] marker
+					diffLines = append(diffLines, fmt.Sprintf("  %s [masked]", genLine))
 				}
 			}
 		}
@@ -246,14 +246,12 @@ func (m PreviewModel) View() string {
 			cursor = ">"
 		}
 
-		// Apply colors based on line type
+		// Apply colors: green for unchanged, yellow for masked
 		style := lipgloss.NewStyle()
-		if strings.HasPrefix(line, "- ") {
-			style = style.Foreground(lipgloss.Color("#FF6B6B"))
-		} else if strings.HasPrefix(line, "+ ") {
-			style = style.Foreground(lipgloss.Color("#00FF00"))
+		if strings.Contains(line, "[masked]") {
+			style = style.Foreground(lipgloss.Color("#FFFF00")) // Yellow for masked
 		} else {
-			style = style.Foreground(lipgloss.Color("#00FF00"))
+			style = style.Foreground(lipgloss.Color("#00FF00")) // Green for unchanged
 		}
 
 		if i == m.cursor {

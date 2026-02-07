@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jellydn/env-man/internal/generator"
-	"github.com/jellydn/env-man/internal/parser"
-	"github.com/jellydn/env-man/internal/scanner"
-	"github.com/jellydn/env-man/internal/tui"
+	"github.com/jellydn/dotenv-tui/internal/generator"
+	"github.com/jellydn/dotenv-tui/internal/parser"
+	"github.com/jellydn/dotenv-tui/internal/scanner"
+	"github.com/jellydn/dotenv-tui/internal/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -178,6 +178,7 @@ func main() {
 		generateEnv     = flag.String("generate-env", "", "Generate .env from specified .env.example file")
 		showHelp        = flag.Bool("help", false, "Show help information")
 		scanFlag        = flag.Bool("scan", false, "Scan directory for .env files")
+		forceFlag       = flag.Bool("force", false, "Force overwrite existing files")
 	)
 
 	flag.Parse()
@@ -188,7 +189,7 @@ func main() {
 	}
 
 	if *generateExample != "" {
-		if err := generateExampleFile(*generateExample); err != nil {
+		if err := generateExampleFile(*generateExample, *forceFlag); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating .env.example: %v\n", err)
 			os.Exit(1)
 		}
@@ -196,7 +197,7 @@ func main() {
 	}
 
 	if *generateEnv != "" {
-		if err := generateEnvFile(*generateEnv); err != nil {
+		if err := generateEnvFile(*generateEnv, *forceFlag); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating .env: %v\n", err)
 			os.Exit(1)
 		}
@@ -235,6 +236,7 @@ FLAGS:
     --generate-example <path>    Generate .env.example from specified .env file
     --generate-env <path>        Generate .env from specified .env.example file
     --scan [directory]           List discovered .env files (default: current directory)
+    --force                      Force overwrite existing files
     --help                       Show this help message
 
 EXAMPLES:
@@ -246,7 +248,7 @@ EXAMPLES:
 `)
 }
 
-func generateExampleFile(inputPath string) error {
+func generateExampleFile(inputPath string, force bool) error {
 	// Read the input .env file
 	file, err := os.Open(inputPath)
 	if err != nil {
@@ -262,8 +264,13 @@ func generateExampleFile(inputPath string) error {
 	// Generate example entries
 	exampleEntries := generator.GenerateExample(entries)
 
-	// Determine output path
-	outputPath := inputPath + ".example"
+	// Determine output path (always output to .env.example in the same directory)
+	outputPath := filepath.Join(filepath.Dir(inputPath), ".env.example")
+
+	// Check if file exists and handle overwrite
+	if _, err := os.Stat(outputPath); err == nil && !force {
+		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
+	}
 
 	// Write to output file
 	outFile, err := os.Create(outputPath)
@@ -280,7 +287,7 @@ func generateExampleFile(inputPath string) error {
 	return nil
 }
 
-func generateEnvFile(inputPath string) error {
+func generateEnvFile(inputPath string, force bool) error {
 	// Read the input .env.example file
 	file, err := os.Open(inputPath)
 	if err != nil {
@@ -295,6 +302,11 @@ func generateEnvFile(inputPath string) error {
 
 	// Determine output path
 	outputPath := filepath.Join(filepath.Dir(inputPath), ".env")
+
+	// Check if file exists and handle overwrite
+	if _, err := os.Stat(outputPath); err == nil && !force {
+		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
+	}
 
 	// Write to output file
 	outFile, err := os.Create(outputPath)
