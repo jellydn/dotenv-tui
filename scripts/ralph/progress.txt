@@ -132,6 +132,29 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - File I/O operations should handle errors gracefully in TUI context
 ---
 
+## [2026-02-07 06:59] - US-010
+[Session: https://opncd.ai/s/placeholder]
+- Implemented CLI flags for non-interactive use with comprehensive functionality
+- Added --generate-example <path> flag that generates .env.example from specified .env file
+- Added --generate-env <path> flag that copies .env.example to .env (without form) 
+- Added --scan [directory] flag that lists discovered .env files to stdout
+- Added --help flag that shows comprehensive usage information and examples
+- Implemented main.go logic to check for flags before launching TUI, using Go's flag package
+- Used existing parser, generator, and scanner packages for CLI operations
+- Fixed test issues: isPlaceholderValue now excludes URLs, picker test fixed for map iteration order
+- Files changed: main.go, internal/tui/form.go, internal/tui/menu_test.go, test files added
+- **Learnings for future iterations:**
+  - Use Go's flag package for CLI argument parsing - it's standard and well-documented
+  - When modifying existing packages, run their tests to ensure compatibility  
+  - Map iteration in Go is not ordered - tests should not rely on specific map iteration order
+  - isPlaceholderValue function needed refinement to exclude URLs that contain "example" 
+  - CLI flags should provide clear help text and examples for better UX
+  - For optional arguments like --scan, check flag.Args() to capture non-flag arguments
+  - Tea.Quit is a function, not a value - tests should check command existence differently
+  - When adding new dependencies, run go mod tidy to fix go.sum issues
+  - Linting tools may have configuration issues - use --no-config when needed
+---
+
 ## [2026-02-07 06:50] - US-009
 [Session: https://opncd.ai/s/placeholder]
 - Implemented TUI editable form for .env generation from .env.example with comprehensive functionality
