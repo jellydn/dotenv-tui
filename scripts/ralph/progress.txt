@@ -269,3 +269,18 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Guard clauses in event handlers prevent unintended transitions (no selection check)
   - Reuse existing scanner functions rather than duplicating scanning logic
 ---
+
+## [2026-02-07 00:08] - US-016
+[Session: https://opncd.ai/s/placeholder]
+- Implemented --yolo CLI flag registration and scanning for .env.example files
+- Added generateAllEnvFiles() function that discovers .env.example files using scanner.ScanExamples()
+- Handled no files case with proper error message and exit code 1
+- Added --yolo flag description to showUsage() function
+- Files changed: main.go, scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - When adding new CLI flags, remember to register them in the flag declarations and handle them in the main function
+  - scanner.ScanExamples() function returns only .env.example files (not .env files)
+  - Use fmt.Fprintf(os.Stderr, ...) for error messages and os.Exit(1) for error conditions
+  - Test CLI flags by building and running the binary with the new flag
+  - Use go test ./... to ensure all existing tests still pass after changes
+---

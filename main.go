@@ -276,6 +276,7 @@ func main() {
 		showHelp        = flag.Bool("help", false, "Show help information")
 		showVersion     = flag.Bool("version", false, "Show version information")
 		scanFlag        = flag.Bool("scan", false, "Scan directory for .env files")
+		yoloFlag        = flag.Bool("yolo", false, "Auto-generate .env from all .env.example files")
 		forceFlag       = flag.Bool("force", false, "Force overwrite existing files")
 		upgradeFlag     = flag.Bool("upgrade", false, "Upgrade to the latest version")
 	)
@@ -321,6 +322,14 @@ func main() {
 		return
 	}
 
+	if *yoloFlag {
+		if err := generateAllEnvFiles(*forceFlag); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if *upgradeFlag {
 		if err := upgrade.Upgrade(getVersion()); err != nil {
 			fmt.Fprintf(os.Stderr, "Error upgrading: %v\n", err)
@@ -346,6 +355,7 @@ FLAGS:
     --generate-example <path>    Generate .env.example from specified .env file
     --generate-env <path>        Generate .env from specified .env.example file
     --scan [directory]           List discovered .env files (default: current directory)
+    --yolo                       Auto-generate .env from all .env.example files
     --force                      Force overwrite existing files
     --upgrade                    Upgrade to the latest version
     --version                    Show version information
@@ -424,6 +434,25 @@ func scanAndList(dir string) error {
 
 	fmt.Printf("Found %d .env file(s):\n", len(files))
 	for _, file := range files {
+		fmt.Printf("  %s\n", file)
+	}
+
+	return nil
+}
+
+func generateAllEnvFiles(force bool) error {
+	exampleFiles, err := scanner.ScanExamples(".")
+	if err != nil {
+		return fmt.Errorf("failed to scan for .env.example files: %w", err)
+	}
+
+	if len(exampleFiles) == 0 {
+		fmt.Fprintf(os.Stderr, "No .env.example files found\n")
+		os.Exit(1)
+	}
+
+	fmt.Printf("Found %d .env.example file(s):\n", len(exampleFiles))
+	for _, file := range exampleFiles {
 		fmt.Printf("  %s\n", file)
 	}
 
