@@ -33,3 +33,7 @@ clean:
 # Build and run
 run: build
     ./dotenv-tui
+
+# Create symlink for local development
+dev-symlink:
+    ln -sf $(pwd)/dotenv-tui ~/.local/bin/dotenv-tui-dev
