@@ -4,7 +4,7 @@ Agent instructions for working in this repository.
 
 ## Project Overview
 
-A terminal UI tool for managing `.env` files across projects and monorepos. Built with Go and the Bubble Tea TUI framework.
+A terminal UI tool for managing `.env` files across projects and monorepos. Built with Go 1.25.6 and the Bubble Tea TUI framework.
 
 ## Build Commands
 
@@ -31,8 +31,7 @@ just test
 # Run tests with verbose output
 just test-v
 
-# Run a single test function
-# Pattern: go test -v -run TestFunctionName ./package/path
+# Run a single test function (pattern: go test -v -run TestFunctionName ./package/path)
 go test -v -run TestParse ./internal/parser
 go test -v -run TestIsSecret ./internal/detector
 
@@ -50,10 +49,10 @@ go test -v -race -coverprofile=coverage.out ./...
 ## Lint/Format Commands
 
 ```bash
-# Run linter
+# Run linter (golangci-lint with .golangci.yml config)
 just lint
 
-# Format code (runs gofmt + goimports)
+# Format code (gofmt + goimports)
 just fmt
 ```
 
@@ -61,9 +60,7 @@ just fmt
 
 ### Imports
 
-- Group imports: standard library, then third-party, then local packages
-- Use `goimports` for automatic import management
-- Local imports use module prefix: `github.com/jellydn/dotenv-tui/internal/parser`
+Group imports: standard library, then third-party, then local packages. Use `goimports` for automatic management.
 
 ```go
 import (
@@ -81,10 +78,9 @@ import (
 
 ### Formatting
 
-- Use `gofmt` for all formatting
-- Use `goimports` for import organization
+- Use `gofmt` and `goimports` for all formatting
 - Indentation: tabs (Go standard)
-- Max line length: follow Go conventions
+- Line length: follow Go conventions
 
 ### Naming Conventions
 
@@ -94,13 +90,11 @@ import (
 - **Structs**: Noun describing the entity (e.g., `KeyValue`, `Comment`)
 - **Methods**: Verb or verb phrase (e.g., `Type()`, `Write()`)
 - **Test functions**: `Test<Name>` with table-driven subtests
-- **Variables**: Descriptive, use short names in short scopes
+- **Variables**: Descriptive; use short names in short scopes
 
 ### Error Handling
 
-- Wrap errors with context using `fmt.Errorf("...: %w", err)`
-- Return errors early (guard clauses)
-- Don't panic; return errors to caller
+Wrap errors with context and return early. Don't panic.
 
 ```go
 if err != nil {
@@ -111,21 +105,16 @@ if err != nil {
 ### Types
 
 - Use interfaces to define behavior (see `Entry` interface)
-- Use struct tags when needed for serialization
 - Prefer concrete types over `interface{}`
 - Use type assertions with ok checks
 
 ### Comments
 
-- Follow Go conventions: start with function/type name
-- Document exported types and functions
-- Keep comments concise and informative
+Follow Go conventions: start with function/type name. Document exported items.
 
 ```go
 // Entry represents a line in a .env file
-type Entry interface {
-    Type() string
-}
+type Entry interface{}
 ```
 
 ### Testing
@@ -134,64 +123,49 @@ type Entry interface {
 - Test files: `*_test.go` in same package
 - Test both success and error cases
 - Use `strings.Builder` for output testing
-- Name test cases descriptively
 
 ### Architecture Patterns
 
 - Interface-based design for extensibility
 - Separate parsing logic into dedicated packages (`internal/parser`)
 - Keep `main.go` minimal (CLI entry point only)
-- Use Bubble Tea's Model-Update-View pattern for TUI
+- Use Bubble Tea's Model-Update-View pattern for TUI components
 
 ## Project Structure
 
 ```
-.
 ├── main.go              # CLI entry point
-├── go.mod               # Go module definition
-├── go.sum               # Go module checksums
 ├── justfile             # Task definitions
+├── go.mod/go.sum        # Go module files
 ├── internal/            # Internal packages
 │   ├── parser/          # .env file parser
-│   │   ├── parser.go
-│   │   └── parser_test.go
 │   ├── detector/        # Secret detection logic
-│   │   ├── detector.go
-│   │   └── detector_test.go
 │   ├── generator/       # .env.example generation
-│   │   ├── generator.go
-│   │   └── generator_test.go
 │   ├── scanner/         # Directory scanning
-│   │   ├── scanner.go
-│   │   └── scanner_test.go
 │   └── tui/             # Bubble Tea TUI components
-│       ├── menu.go
-│       ├── picker.go
-│       ├── preview.go
-│       ├── form.go
-│       └── *_test.go
-└── scripts/             # Development scripts
+└── testdata/            # Test fixtures
 ```
 
-## Dependencies
+## Tools & Dependencies
 
-- **Bubble Tea**: TUI framework (github.com/charmbracelet/bubbletea)
-- **Bubbles**: Bubble Tea components (github.com/charmbracelet/bubbles)
-- **Lip Gloss**: Styling (github.com/charmbracelet/lipgloss)
-- Standard Go library for file I/O
-
-## Tools Required
+**Required:**
 
 - Go 1.25.6+
 - `just` (command runner)
-- `golangci-lint` (linting)
+- `golangci-lint` (linting with revive, staticcheck, gocritic)
 - `goimports` (import formatting)
+
+**Key Dependencies:**
+
+- `github.com/charmbracelet/bubbletea` — TUI framework
+- `github.com/charmbracelet/bubbles` — TUI components
+- `github.com/charmbracelet/lipgloss` — Styling
 
 ## Notes
 
 - Preserve comments and blank lines when parsing .env files
 - Maintain key ordering from original files
 - The parser uses an `Entry` interface for different line types (KeyValue, Comment, BlankLine)
-- This is a Bubble Tea TUI application - follow the Model-Update-View architecture
 - The detector uses pattern matching to identify secrets in key-value pairs
-- Placeholders preserve format hints (prefix patterns) for context
+- Placeholders preserve format hints (prefix patterns) for context (e.g., `sk_***`, `ghp_***`)
+- Follow Model-Update-View architecture for all TUI components
