@@ -463,48 +463,54 @@ func generateAllEnvFiles(force bool) error {
 
 	// Generate .env files from each .env.example file
 	for _, exampleFile := range exampleFiles {
-		outputPath := exampleFile[:len(exampleFile)-len(".example")]
-
-		file, err := os.Open(exampleFile)
-		if err != nil {
-			return fmt.Errorf("failed to open %s: %w", exampleFile, err)
+		if err := processExampleFile(exampleFile, force, &generated, &skipped); err != nil {
+			return err
 		}
-		defer func() { _ = file.Close() }()
-
-		entries, err := parser.Parse(file)
-		if err != nil {
-			return fmt.Errorf("failed to parse %s: %w", exampleFile, err)
-		}
-
-		// Check if file exists and prompt for overwrite if not using force
-		if _, err := os.Stat(outputPath); err == nil && !force {
-			fmt.Printf("%s already exists. Overwrite? [y/N] ", outputPath)
-			reader := bufio.NewReader(os.Stdin)
-			response, _ := reader.ReadString('\n')
-			response = strings.TrimSpace(response)
-
-			if response != "y" && response != "Y" {
-				fmt.Printf("Skipped %s\n", outputPath)
-				skipped++
-				continue
-			}
-		}
-
-		outFile, err := os.Create(outputPath)
-		if err != nil {
-			return fmt.Errorf("failed to create %s: %w", outputPath, err)
-		}
-		defer func() { _ = outFile.Close() }()
-
-		if err := parser.Write(outFile, entries); err != nil {
-			return fmt.Errorf("failed to write %s: %w", outputPath, err)
-		}
-
-		fmt.Printf("Generated %s\n", outputPath)
-		generated++
 	}
 
 	// Print summary
 	fmt.Printf("Done: %d generated, %d skipped\n", generated, skipped)
+	return nil
+}
+
+func processExampleFile(exampleFile string, force bool, generated, skipped *int) error {
+	outputPath := strings.TrimSuffix(exampleFile, ".example")
+
+	file, err := os.Open(exampleFile)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %w", exampleFile, err)
+	}
+	defer func() { _ = file.Close() }()
+
+	entries, err := parser.Parse(file)
+	if err != nil {
+		return fmt.Errorf("failed to parse %s: %w", exampleFile, err)
+	}
+
+	if _, err := os.Stat(outputPath); err == nil && !force {
+		fmt.Printf("%s already exists. Overwrite? [y/N] ", outputPath)
+		reader := bufio.NewReader(os.Stdin)
+		response, _ := reader.ReadString('\n')
+		response = strings.TrimSpace(response)
+
+		if response != "y" && response != "Y" {
+			fmt.Printf("Skipped %s\n", outputPath)
+			*skipped++
+			return nil
+		}
+	}
+
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create %s: %w", outputPath, err)
+	}
+	defer func() { _ = outFile.Close() }()
+
+	if err := parser.Write(outFile, entries); err != nil {
+		return fmt.Errorf("failed to write %s: %w", outputPath, err)
+	}
+
+	fmt.Printf("Generated %s\n", outputPath)
+	*generated++
 	return nil
 }
