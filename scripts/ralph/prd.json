@@ -200,7 +200,7 @@
         "go build succeeds"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -217,8 +217,8 @@
         "go build succeeds"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented directory grouping with visual headers. Files are grouped by directory with non-selectable headers, sorted alphabetically within groups and groups sorted alphabetically by directory path."
     },
     {
       "id": "US-014",

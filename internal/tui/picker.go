@@ -2,16 +2,26 @@
 package tui
 
 import (
+	"path/filepath"
+	"sort"
+
 	"github.com/jellydn/dotenv-tui/internal/scanner"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
+// pickerItem represents an item in the picker list (either a header or a file).
+type pickerItem struct {
+	text     string
+	filePath string // empty for headers
+	isHeader bool
+}
+
 // PickerModel is the Bubble Tea model for selecting .env files.
 type PickerModel struct {
-	files    []string
-	selected map[int]bool
+	items    []pickerItem
+	selected map[int]bool // only applies to non-header items
 	cursor   int
 	mode     MenuChoice
 	rootDir  string
@@ -21,6 +31,49 @@ type PickerModel struct {
 type PickerFinishedMsg struct {
 	Selected []string
 	Mode     MenuChoice
+}
+
+// groupFilesByDirectory groups files by directory and creates picker items with headers.
+func groupFilesByDirectory(files []string) []pickerItem {
+	// Group files by directory
+	dirGroups := make(map[string][]string)
+	for _, file := range files {
+		dir := filepath.Dir(file)
+		if dir == "." {
+			dir = "Current Directory"
+		}
+		dirGroups[dir] = append(dirGroups[dir], file)
+	}
+
+	// Sort directories alphabetically
+	var dirs []string
+	for dir := range dirGroups {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+
+	// Create items with headers and sorted files
+	var items []pickerItem
+	for _, dir := range dirs {
+		// Add header
+		items = append(items, pickerItem{
+			text:     dir,
+			filePath: "",
+			isHeader: true,
+		})
+
+		// Sort files within the directory alphabetically
+		sort.Strings(dirGroups[dir])
+		for _, file := range dirGroups[dir] {
+			items = append(items, pickerItem{
+				text:     file,
+				filePath: file,
+				isHeader: false,
+			})
+		}
+	}
+
+	return items
 }
 
 // NewPickerModel creates a file picker for selecting .env files.
@@ -42,15 +95,20 @@ func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
 		files = []string{}
 	}
 
-	// Initialize with no files selected by default
+	// Group files by directory with headers
+	items := groupFilesByDirectory(files)
+
+	// Initialize with no files selected by default (only for non-header items)
 	selected := make(map[int]bool)
-	for i := range files {
-		selected[i] = false
+	for i, item := range items {
+		if !item.isHeader {
+			selected[i] = false
+		}
 	}
 
 	return func() tea.Msg {
 		return pickerInitMsg{
-			files:    files,
+			items:    items,
 			selected: selected,
 			mode:     mode,
 			rootDir:  rootDir,
@@ -59,7 +117,7 @@ func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
 }
 
 type pickerInitMsg struct {
-	files    []string
+	items    []pickerItem
 	selected map[int]bool
 	mode     MenuChoice
 	rootDir  string
@@ -70,48 +128,66 @@ func (m PickerModel) Init() tea.Cmd {
 	return nil
 }
 
+// findNextSelectableItem finds the next selectable (non-header) item.
+func (m PickerModel) findNextSelectableItem(from int, direction int) int {
+	for i := from; i >= 0 && i < len(m.items); i += direction {
+		if !m.items[i].isHeader {
+			return i
+		}
+	}
+	return from // return original if no selectable item found
+}
+
 // Update handles messages and updates the picker model.
 func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case pickerInitMsg:
-		m.files = msg.files
+		m.items = msg.items
 		m.selected = msg.selected
 		m.mode = msg.mode
 		m.rootDir = msg.rootDir
+		// Set cursor to first selectable item
+		if len(m.items) > 0 {
+			m.cursor = m.findNextSelectableItem(0, 1)
+		}
 		return m, nil
 
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
 			if m.cursor > 0 {
-				m.cursor--
+				newCursor := m.cursor - 1
+				m.cursor = m.findNextSelectableItem(newCursor, -1)
 			}
 		case "down", "j":
-			if m.cursor < len(m.files)-1 {
-				m.cursor++
+			if m.cursor < len(m.items)-1 {
+				newCursor := m.cursor + 1
+				m.cursor = m.findNextSelectableItem(newCursor, 1)
 			}
 		case " ":
-			if len(m.files) > 0 {
+			if len(m.items) > 0 && !m.items[m.cursor].isHeader {
 				m.selected[m.cursor] = !m.selected[m.cursor]
 			}
 		case "a":
-			if len(m.files) > 0 {
+			if len(m.items) > 0 {
 				allSelected := true
-				for i := range m.files {
-					if !m.selected[i] {
+				for i := range m.items {
+					if !m.items[i].isHeader && !m.selected[i] {
 						allSelected = false
 						break
 					}
 				}
-				for i := range m.files {
-					m.selected[i] = !allSelected
+				for i := range m.items {
+					if !m.items[i].isHeader {
+						m.selected[i] = !allSelected
+					}
 				}
 			}
 		case "enter":
 			var selectedFiles []string
-			for i := 0; i < len(m.files); i++ {
-				if m.selected[i] {
-					selectedFiles = append(selectedFiles, m.files[i])
+			for i := 0; i < len(m.items); i++ {
+				if !m.items[i].isHeader && m.selected[i] {
+					selectedFiles = append(selectedFiles, m.items[i].filePath)
 				}
 			}
 			// Only proceed if at least one file is selected
@@ -152,7 +228,15 @@ func (m PickerModel) View() string {
 		Padding(0, 1).
 		Render(titleText)
 
-	if len(m.files) == 0 {
+	// Count actual files (non-header items)
+	fileCount := 0
+	for _, item := range m.items {
+		if !item.isHeader {
+			fileCount++
+		}
+	}
+
+	if fileCount == 0 {
 		var noFilesText string
 		switch m.mode {
 		case GenerateExample:
@@ -170,7 +254,7 @@ func (m PickerModel) View() string {
 
 	var list string
 
-	if len(m.files) == 1 {
+	if fileCount == 1 {
 		var fileType string
 		switch m.mode {
 		case GenerateExample:
@@ -186,23 +270,32 @@ func (m PickerModel) View() string {
 		list += singleFileIndicator + "\n\n"
 	}
 
-	for i, file := range m.files {
-		cursor := " "
-		if i == m.cursor {
-			cursor = ">"
-		}
+	for i, item := range m.items {
+		if item.isHeader {
+			// Render header with different style
+			headerStyle := lipgloss.NewStyle().
+				Bold(true).
+				Faint(true).
+				PaddingLeft(2)
+			list += headerStyle.Render(item.text) + "\n"
+		} else {
+			cursor := " "
+			if i == m.cursor {
+				cursor = ">"
+			}
 
-		checkbox := "[ ]"
-		if m.selected[i] {
-			checkbox = "[x]"
-		}
+			checkbox := "[ ]"
+			if m.selected[i] {
+				checkbox = "[x]"
+			}
 
-		style := lipgloss.NewStyle()
-		if i == m.cursor {
-			style = style.Foreground(lipgloss.Color("#7D56F4")).Bold(true)
-		}
+			style := lipgloss.NewStyle()
+			if i == m.cursor {
+				style = style.Foreground(lipgloss.Color("#7D56F4")).Bold(true)
+			}
 
-		list += style.Render(cursor+" "+checkbox+" "+file) + "\n"
+			list += style.Render(cursor+" "+checkbox+" "+item.text) + "\n"
+		}
 	}
 
 	help := lipgloss.NewStyle().

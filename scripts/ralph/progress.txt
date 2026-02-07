@@ -192,3 +192,41 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Map lookup for skip directories is efficient and maintainable across multiple scan functions
   - Use consistent error handling patterns across similar functions
 ---
+
+## [2026-02-07 13:15] - US-013
+[Session: https://opncd.ai/s/placeholder]
+- Implemented directory grouping with visual headers in the file picker
+- Created pickerItem struct with isHeader bool to distinguish directory headers from selectable files
+- Files are grouped by filepath.Dir() with non-selectable directory headers rendered above each group
+- Directory headers are styled differently (dimmed and bold) and cursor skips them during navigation
+- Files within each group are sorted alphabetically, and groups are sorted alphabetically by directory path
+- Space and 'a' keybindings only affect selectable file items, not headers
+- Added comprehensive unit tests for the new groupFilesByDirectory function
+- Files changed: internal/tui/picker.go, internal/tui/picker_test.go
+- **Learnings for future iterations:**
+  - When implementing visual grouping, use struct composition to distinguish between different item types (headers vs selectable items)
+  - findNextSelectableItem helper function is essential for proper cursor navigation when dealing with mixed item types
+  - Directory path grouping with filepath.Dir() works well - use "Current Directory" for files in the root directory for better UX
+  - Use sort.Strings() for both directories and files within directories to ensure consistent ordering
+  - Map iteration order is not guaranteed - tests should not rely on specific order when working with maps
+  - Test both the grouping logic (groupFilesByDirectory) and the integration with the full picker model
+  - Lipgloss styling makes headers visually distinct - use different styles for headers vs selectable items
+  - When modifying complex structures like the picker, comprehensive test coverage is essential to prevent regressions
+---
+
+## [2026-02-07 07:20] - US-012
+[Session: https://opncd.ai/s/placeholder]
+- Updated picker to default to no selection and filter files by mode with comprehensive functionality
+- Modified NewPickerModel() to call scanner.Scan() for GenerateExample and scanner.ScanExamples() for GenerateEnv
+- Changed initialization to select no files by default (selected map with all false values)
+- Updated UI text dynamically based on mode: titles, no-files messages, single-file indicators
+- Modified Enter key handler to only proceed when at least one file is selected
+- Maintained existing space toggle and 'a' key toggle all functionality for both modes
+- Files changed: internal/tui/picker.go
+- **Learnings for future iterations:**
+  - When implementing mode-dependent behavior, use switch statements on the mode enum for clarity
+  - Dynamic UI text improves UX by showing relevant messages for each mode
+  - Initialize maps with explicit values (false) rather than relying on zero values for clarity
+  - Guard clauses in event handlers prevent unintended transitions (no selection check)
+  - Reuse existing scanner functions rather than duplicating scanning logic
+---
