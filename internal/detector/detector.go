@@ -46,7 +46,7 @@ func GeneratePlaceholder(key string, value string) string {
 		if strings.HasPrefix(value, "https://") {
 			return "https://***"
 		}
-		return "***://***"
+		return "***" // fallback for non-http/https URLs
 	}
 
 	// API key prefixes
@@ -78,7 +78,7 @@ func isSecretKey(key string) bool {
 	keyUpper := strings.ToUpper(key)
 
 	secretPatterns := []string{
-		"SECRET", "KEY", "TOKEN", "PASSWORD", "PASS", "AUTH",
+		"SECRET", "TOKEN", "PASSWORD", "PASS", "AUTH",
 		"CREDENTIAL", "PRIVATE", "API_KEY", "ACCESS_KEY",
 	}
 
@@ -104,6 +104,24 @@ func isSecretValue(value string) bool {
 	// JWT tokens (must be longer than 50 chars to be considered a real JWT)
 	if strings.HasPrefix(value, "eyJ") && len(value) > 50 {
 		return true
+	}
+
+	// Known secret prefixes
+	lowerValue := strings.ToLower(value)
+	knownSecretPrefixes := []string{
+		"sk_live_", "sk_test_", "rk_live_", "rk_test_",
+		"ghp_", "gho_", "ghu_", "ghs_", "github_pat_",
+		"pk_live_", "pk_test_",
+		"xoxb-", "xoxp-", "xoxa-",
+		"ya29.",
+		"whsec_",
+		"akiai", "akia", // AWS access key
+		"age-secret-key-",
+	}
+	for _, prefix := range knownSecretPrefixes {
+		if strings.HasPrefix(lowerValue, prefix) {
+			return true
+		}
 	}
 
 	// Base64 strings longer than 20 chars (but not JWT tokens)
