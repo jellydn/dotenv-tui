@@ -116,11 +116,11 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 			if msg.Mode == tui.GenerateExample {
 				m.currentScreen = previewScreen
-				return m, tui.NewPreviewModel(msg.Selected[0], nil)
+				return m, tui.NewPreviewModel(msg.Selected[0], 0, len(msg.Selected))
 			}
 			if msg.Mode == tui.GenerateEnv {
 				m.currentScreen = formScreen
-				return m, tui.NewFormModel(msg.Selected[0])
+				return m, tui.NewFormModel(msg.Selected[0], 0, len(msg.Selected))
 			}
 		}
 		m.currentScreen = menuScreen
@@ -186,21 +186,21 @@ func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 			m.fileIndex = (m.fileIndex + 1) % len(m.fileList)
 			if m.pickerMode == tui.GenerateExample {
 				m.currentScreen = previewScreen
-				return m, tui.NewPreviewModel(m.fileList[m.fileIndex], nil)
+				return m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 			}
 			if m.pickerMode == tui.GenerateEnv {
 				m.currentScreen = formScreen
-				return m, tui.NewFormModel(m.fileList[m.fileIndex])
+				return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 			}
 		case "shift+tab":
 			m.fileIndex = (m.fileIndex - 1 + len(m.fileList)) % len(m.fileList)
 			if m.pickerMode == tui.GenerateExample {
 				m.currentScreen = previewScreen
-				return m, tui.NewPreviewModel(m.fileList[m.fileIndex], nil)
+				return m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 			}
 			if m.pickerMode == tui.GenerateEnv {
 				m.currentScreen = formScreen
-				return m, tui.NewFormModel(m.fileList[m.fileIndex])
+				return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 			}
 		case "q", "esc":
 			m.currentScreen = menuScreen

@@ -33,6 +33,8 @@ type FormModel struct {
 	confirmed       bool
 	errorMsg        string
 	successMsg      string
+	fileIndex       int
+	totalFiles      int
 }
 
 // FormFinishedMsg signals the form has completed with success status.
@@ -45,16 +47,20 @@ type formInitMsg struct {
 	fields          []FormField
 	originalEntries []parser.Entry
 	filePath        string
+	fileIndex       int
+	totalFiles      int
 }
 
 // NewFormModel creates a new form model for collecting environment variables.
-func NewFormModel(exampleFilePath string) tea.Cmd {
+func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 	return func() tea.Msg {
 		file, err := os.Open(exampleFilePath)
 		if err != nil {
 			return formInitMsg{
-				filePath: exampleFilePath,
-				fields:   []FormField{},
+				filePath:   exampleFilePath,
+				fields:     []FormField{},
+				fileIndex:  fileIndex,
+				totalFiles: totalFiles,
 			}
 		}
 		defer func() { _ = file.Close() }()
@@ -62,8 +68,10 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 		entries, err := parser.Parse(file)
 		if err != nil {
 			return formInitMsg{
-				filePath: exampleFilePath,
-				fields:   []FormField{},
+				filePath:   exampleFilePath,
+				fields:     []FormField{},
+				fileIndex:  fileIndex,
+				totalFiles: totalFiles,
 			}
 		}
 
@@ -98,6 +106,8 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 			fields:          fields,
 			originalEntries: entries,
 			filePath:        exampleFilePath,
+			fileIndex:       fileIndex,
+			totalFiles:      totalFiles,
 		}
 	}
 }
@@ -178,6 +188,8 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.fields = msg.fields
 		m.originalEntries = msg.originalEntries
 		m.filePath = msg.filePath
+		m.fileIndex = msg.fileIndex
+		m.totalFiles = msg.totalFiles
 
 		// Set focus on first field if there are any
 		if len(m.fields) > 0 {
@@ -341,9 +353,10 @@ func (m FormModel) View() string {
 		Bold(true).
 		Render("Edit Environment Variables")
 
+	positionText := fmt.Sprintf("[%d/%d] %s", m.fileIndex+1, m.totalFiles, m.filePath)
 	subtitle := lipgloss.NewStyle().
 		Faint(true).
-		Render(fmt.Sprintf("Editing: %s", m.filePath))
+		Render(positionText)
 
 	var form strings.Builder
 
