@@ -437,8 +437,7 @@ func generateAllEnvFiles(force bool) error {
 	}
 
 	if len(exampleFiles) == 0 {
-		fmt.Fprintf(os.Stderr, "No .env.example files found\n")
-		os.Exit(1)
+		return fmt.Errorf("no .env.example files found")
 	}
 
 	fmt.Printf("Found %d .env.example file(s):\n", len(exampleFiles))
@@ -474,7 +473,10 @@ func processExampleFile(exampleFile string, force bool, generated, skipped *int)
 	if _, err := os.Stat(outputPath); err == nil && !force {
 		fmt.Printf("%s already exists. Overwrite? [y/N] ", outputPath)
 		reader := bufio.NewReader(os.Stdin)
-		response, _ := reader.ReadString('\n')
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read user input: %w", err)
+		}
 		response = strings.TrimSpace(response)
 
 		if response != "y" && response != "Y" {
@@ -488,10 +490,14 @@ func processExampleFile(exampleFile string, force bool, generated, skipped *int)
 	if err != nil {
 		return fmt.Errorf("failed to create %s: %w", outputPath, err)
 	}
-	defer func() { _ = outFile.Close() }()
 
 	if err := parser.Write(outFile, entries); err != nil {
+		_ = outFile.Close()
 		return fmt.Errorf("failed to write %s: %w", outputPath, err)
+	}
+
+	if err := outFile.Close(); err != nil {
+		return fmt.Errorf("failed to close %s: %w", outputPath, err)
 	}
 
 	fmt.Printf("Generated %s\n", outputPath)
