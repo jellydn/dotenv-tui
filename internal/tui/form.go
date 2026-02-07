@@ -169,6 +169,11 @@ func (m FormModel) Init() tea.Cmd {
 // moveCursor moves the cursor and updates scroll position
 const visibleFields = 7
 
+const (
+	directionUp   = -1
+	directionDown = 1
+)
+
 func (m *FormModel) moveCursor(newCursor int) {
 	m.fields[m.cursor].Input.Blur()
 	m.cursor = newCursor
@@ -178,6 +183,13 @@ func (m *FormModel) moveCursor(newCursor int) {
 		m.scroll = m.cursor
 	} else if m.cursor >= m.scroll+visibleFields {
 		m.scroll = m.cursor - visibleFields + 1
+	}
+}
+
+func (m *FormModel) moveCursorByDirection(dir int) {
+	newCursor := m.cursor + dir
+	if newCursor >= 0 && newCursor < len(m.fields) {
+		m.moveCursor(newCursor)
 	}
 }
 
@@ -222,31 +234,17 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "up", "k":
-			if m.cursor > 0 {
-				m.moveCursor(m.cursor - 1)
-			}
-		case "down", "j":
-			if m.cursor < len(m.fields)-1 {
-				m.moveCursor(m.cursor + 1)
-			}
-		case "tab":
-			if m.cursor < len(m.fields)-1 {
-				m.moveCursor(m.cursor + 1)
-			}
-		case "shift+tab":
-			if m.cursor > 0 {
-				m.moveCursor(m.cursor - 1)
-			}
+		case "up", "k", "shift+tab":
+			m.moveCursorByDirection(directionUp)
+		case "down", "j", "tab":
+			m.moveCursorByDirection(directionDown)
 		case "ctrl+s":
 			return m, m.saveForm()
 		case "enter":
 			if m.cursor == len(m.fields)-1 {
 				return m, m.saveForm()
 			}
-			if m.cursor < len(m.fields)-1 {
-				m.moveCursor(m.cursor + 1)
-			}
+			m.moveCursorByDirection(directionDown)
 		case "q", "esc":
 			return m, func() tea.Msg {
 				return FormFinishedMsg{Success: false, Error: "cancelled"}

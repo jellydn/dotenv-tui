@@ -7,6 +7,32 @@ import (
 	"strings"
 )
 
+var (
+	secretPatternsMap = map[string]bool{
+		"SECRET": true, "TOKEN": true, "PASSWORD": true, "PASS": true,
+		"AUTH": true, "CREDENTIAL": true, "PRIVATE": true,
+		"API_KEY": true, "ACCESS_KEY": true,
+	}
+	knownSecretPrefixesMap = map[string]bool{
+		"sk_live_": true, "sk_test_": true, "rk_live_": true, "rk_test_": true,
+		"ghp_": true, "gho_": true, "ghu_": true, "ghs_": true, "github_pat_": true,
+		"pk_live_": true, "pk_test_": true,
+		"xoxb-": true, "xoxp-": true, "xoxa-": true,
+		"ya29.":  true,
+		"whsec_": true,
+		"akiai":  true, "akia": true,
+		"age-secret-key-": true,
+	}
+	commonNonSecretsMap = map[string]bool{
+		"PORT": true, "HOST": true, "NODE_ENV": true, "APP_NAME": true,
+		"DEBUG": true, "LOG_LEVEL": true,
+		"ENV": true, "ENVIRONMENT": true, "VERSION": true, "LANG": true,
+		"TIMEZONE": true, "REGION": true,
+		"ENDPOINT": true, "URL": true, "URI": true, "DOMAIN": true,
+		"SERVER": true, "CLUSTER": true,
+	}
+)
+
 // IsSecret determines if a key-value pair appears to contain a secret
 func IsSecret(key string, value string) bool {
 	if isCommonNonSecret(key) {
@@ -70,18 +96,11 @@ func GeneratePlaceholder(_ string, value string) string {
 
 func isSecretKey(key string) bool {
 	keyUpper := strings.ToUpper(key)
-
-	secretPatterns := []string{
-		"SECRET", "TOKEN", "PASSWORD", "PASS", "AUTH",
-		"CREDENTIAL", "PRIVATE", "API_KEY", "ACCESS_KEY",
-	}
-
-	for _, pattern := range secretPatterns {
+	for pattern := range secretPatternsMap {
 		if strings.Contains(keyUpper, pattern) {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -102,17 +121,7 @@ func isSecretValue(value string) bool {
 
 	// Known secret prefixes
 	lowerValue := strings.ToLower(value)
-	knownSecretPrefixes := []string{
-		"sk_live_", "sk_test_", "rk_live_", "rk_test_",
-		"ghp_", "gho_", "ghu_", "ghs_", "github_pat_",
-		"pk_live_", "pk_test_",
-		"xoxb-", "xoxp-", "xoxa-",
-		"ya29.",
-		"whsec_",
-		"akiai", "akia", // AWS access key
-		"age-secret-key-",
-	}
-	for _, prefix := range knownSecretPrefixes {
+	for prefix := range knownSecretPrefixesMap {
 		if strings.HasPrefix(lowerValue, prefix) {
 			return true
 		}
@@ -132,21 +141,7 @@ func isSecretValue(value string) bool {
 }
 
 func isCommonNonSecret(key string) bool {
-	keyUpper := strings.ToUpper(key)
-
-	commonNonSecrets := []string{
-		"PORT", "HOST", "NODE_ENV", "APP_NAME", "DEBUG", "LOG_LEVEL",
-		"ENV", "ENVIRONMENT", "VERSION", "LANG", "TIMEZONE", "REGION",
-		"ENDPOINT", "URL", "URI", "DOMAIN", "SERVER", "CLUSTER",
-	}
-
-	for _, nonSecret := range commonNonSecrets {
-		if keyUpper == nonSecret {
-			return true
-		}
-	}
-
-	return false
+	return commonNonSecretsMap[strings.ToUpper(key)]
 }
 
 func isBase64(s string) bool {

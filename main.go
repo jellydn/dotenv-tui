@@ -125,9 +125,7 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			m.currentScreen = menuScreen
-			m.menu = tui.NewMenuModel()
-			return m, nil
+			return returnToMenu(m), nil
 		}
 	}
 
@@ -146,9 +144,7 @@ func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			m.currentScreen = menuScreen
-			m.menu = tui.NewMenuModel()
-			return m, nil
+			return returnToMenu(m), nil
 		}
 	}
 
@@ -167,9 +163,7 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			m.currentScreen = menuScreen
-			m.menu = tui.NewMenuModel()
-			return m, nil
+			return returnToMenu(m), nil
 		}
 	}
 
@@ -183,6 +177,12 @@ func (m *model) navigateToFile() (tea.Model, tea.Cmd) {
 	}
 	m.currentScreen = formScreen
 	return *m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+}
+
+func returnToMenu(m model) tea.Model {
+	m.currentScreen = menuScreen
+	m.menu = tui.NewMenuModel()
+	return m
 }
 
 func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
@@ -199,9 +199,7 @@ func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 				return m.navigateToFile()
 			}
 		case "q", "esc":
-			m.currentScreen = menuScreen
-			m.menu = tui.NewMenuModel()
-			return m, nil
+			return returnToMenu(m), nil
 		}
 	}
 	return m, nil
@@ -343,7 +341,9 @@ EXAMPLES:
 `)
 }
 
-func generateExampleFile(inputPath string, force bool) error {
+type entryProcessor func([]parser.Entry) []parser.Entry
+
+func generateFile(inputPath string, force bool, outputFilename string, processEntries entryProcessor, parseErrMsg string) error {
 	file, err := os.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to open input file: %w", err)
@@ -352,12 +352,12 @@ func generateExampleFile(inputPath string, force bool) error {
 
 	entries, err := parser.Parse(file)
 	if err != nil {
-		return fmt.Errorf("failed to parse .env file: %w", err)
+		return fmt.Errorf("failed to parse %s: %w", parseErrMsg, err)
 	}
 
-	exampleEntries := generator.GenerateExample(entries)
+	processedEntries := processEntries(entries)
 
-	outputPath := filepath.Join(filepath.Dir(inputPath), ".env.example")
+	outputPath := filepath.Join(filepath.Dir(inputPath), outputFilename)
 
 	if _, err := os.Stat(outputPath); err == nil && !force {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
@@ -369,7 +369,7 @@ func generateExampleFile(inputPath string, force bool) error {
 	}
 	defer func() { _ = outFile.Close() }()
 
-	if err := parser.Write(outFile, exampleEntries); err != nil {
+	if err := parser.Write(outFile, processedEntries); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
@@ -377,36 +377,14 @@ func generateExampleFile(inputPath string, force bool) error {
 	return nil
 }
 
+func generateExampleFile(inputPath string, force bool) error {
+	return generateFile(inputPath, force, ".env.example", generator.GenerateExample, ".env file")
+}
+
 func generateEnvFile(inputPath string, force bool) error {
-	file, err := os.Open(inputPath)
-	if err != nil {
-		return fmt.Errorf("failed to open input file: %w", err)
-	}
-	defer func() { _ = file.Close() }()
-
-	entries, err := parser.Parse(file)
-	if err != nil {
-		return fmt.Errorf("failed to parse .env.example file: %w", err)
-	}
-
-	outputPath := filepath.Join(filepath.Dir(inputPath), ".env")
-
-	if _, err := os.Stat(outputPath); err == nil && !force {
-		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
-	}
-
-	outFile, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer func() { _ = outFile.Close() }()
-
-	if err := parser.Write(outFile, entries); err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
-	}
-
-	fmt.Printf("Generated %s\n", outputPath)
-	return nil
+	return generateFile(inputPath, force, ".env", func(entries []parser.Entry) []parser.Entry {
+		return entries
+	}, ".env.example file")
 }
 
 func scanAndList(dir string) error {
