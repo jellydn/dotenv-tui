@@ -456,5 +456,37 @@ func generateAllEnvFiles(force bool) error {
 		fmt.Printf("  %s\n", file)
 	}
 
+	// Generate .env files from each .env.example file
+	for _, exampleFile := range exampleFiles {
+		outputPath := exampleFile[:len(exampleFile)-len(".example")]
+
+		file, err := os.Open(exampleFile)
+		if err != nil {
+			return fmt.Errorf("failed to open %s: %w", exampleFile, err)
+		}
+		defer func() { _ = file.Close() }()
+
+		entries, err := parser.Parse(file)
+		if err != nil {
+			return fmt.Errorf("failed to parse %s: %w", exampleFile, err)
+		}
+
+		if _, err := os.Stat(outputPath); err == nil && !force {
+			return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
+		}
+
+		outFile, err := os.Create(outputPath)
+		if err != nil {
+			return fmt.Errorf("failed to create %s: %w", outputPath, err)
+		}
+		defer func() { _ = outFile.Close() }()
+
+		if err := parser.Write(outFile, entries); err != nil {
+			return fmt.Errorf("failed to write %s: %w", outputPath, err)
+		}
+
+		fmt.Printf("Generated %s\n", outputPath)
+	}
+
 	return nil
 }
