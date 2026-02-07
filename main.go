@@ -12,6 +12,7 @@ import (
 	"github.com/jellydn/dotenv-tui/internal/parser"
 	"github.com/jellydn/dotenv-tui/internal/scanner"
 	"github.com/jellydn/dotenv-tui/internal/tui"
+	"github.com/jellydn/dotenv-tui/internal/upgrade"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -85,7 +86,6 @@ func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "enter" || keyMsg.String() == " " {
-			// Transition to picker
 			m.currentScreen = pickerScreen
 			return m, tui.NewPickerModel(m.menu.Choice(), ".")
 		}
@@ -102,24 +102,19 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tui.PickerFinishedMsg:
-		// If generating .env.example, transition to preview
 		if msg.Mode == tui.GenerateExample && len(msg.Selected) > 0 {
 			m.currentScreen = previewScreen
-			// For now, just use the first selected file
 			return m, tui.NewPreviewModel(msg.Selected[0], nil)
 		}
-		// If generating .env, transition to form (assuming first selection is .env.example)
 		if msg.Mode == tui.GenerateEnv && len(msg.Selected) > 0 {
 			m.currentScreen = formScreen
 			return m, tui.NewFormModel(msg.Selected[0])
 		}
-		// For other cases or no selection, go back to menu
 		m.currentScreen = menuScreen
 		m.menu = tui.NewMenuModel()
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			// Return to menu
 			m.currentScreen = menuScreen
 			m.menu = tui.NewMenuModel()
 			return m, nil
@@ -137,13 +132,11 @@ func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tui.PreviewFinishedMsg:
-		// Go back to menu after preview is finished
 		m.currentScreen = menuScreen
 		m.menu = tui.NewMenuModel()
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			// Return to menu
 			m.currentScreen = menuScreen
 			m.menu = tui.NewMenuModel()
 			return m, nil
@@ -161,13 +154,11 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tui.FormFinishedMsg:
-		// Go back to menu after form is finished
 		m.currentScreen = menuScreen
 		m.menu = tui.NewMenuModel()
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			// Return to menu
 			m.currentScreen = menuScreen
 			m.menu = tui.NewMenuModel()
 			return m, nil
@@ -200,6 +191,7 @@ func main() {
 		showVersion     = flag.Bool("version", false, "Show version information")
 		scanFlag        = flag.Bool("scan", false, "Scan directory for .env files")
 		forceFlag       = flag.Bool("force", false, "Force overwrite existing files")
+		upgradeFlag     = flag.Bool("upgrade", false, "Upgrade to the latest version")
 	)
 
 	flag.Parse()
@@ -231,7 +223,6 @@ func main() {
 	}
 
 	if *scanFlag {
-		// Check if next argument is a directory path
 		args := flag.Args()
 		scanPath := "."
 		if len(args) > 0 {
@@ -244,7 +235,14 @@ func main() {
 		return
 	}
 
-	// No flags provided, launch TUI
+	if *upgradeFlag {
+		if err := upgrade.Upgrade(getVersion()); err != nil {
+			fmt.Fprintf(os.Stderr, "Error upgrading: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v", err)
@@ -263,6 +261,7 @@ FLAGS:
     --generate-env <path>        Generate .env from specified .env.example file
     --scan [directory]           List discovered .env files (default: current directory)
     --force                      Force overwrite existing files
+    --upgrade                    Upgrade to the latest version
     --version                    Show version information
     --help                       Show this help message
 
@@ -272,11 +271,11 @@ EXAMPLES:
     dotenv-tui --generate-env .env.example       # Generate .env from .env.example
     dotenv-tui --scan                             # Scan current directory for .env files
     dotenv-tui --scan ./myproject                 # Scan specific directory
+    dotenv-tui --upgrade                          # Upgrade to the latest version
 `)
 }
 
 func generateExampleFile(inputPath string, force bool) error {
-	// Read the input .env file
 	file, err := os.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to open input file: %w", err)
@@ -288,18 +287,14 @@ func generateExampleFile(inputPath string, force bool) error {
 		return fmt.Errorf("failed to parse .env file: %w", err)
 	}
 
-	// Generate example entries
 	exampleEntries := generator.GenerateExample(entries)
 
-	// Determine output path (always output to .env.example in the same directory)
 	outputPath := filepath.Join(filepath.Dir(inputPath), ".env.example")
 
-	// Check if file exists and handle overwrite
 	if _, err := os.Stat(outputPath); err == nil && !force {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
 	}
 
-	// Write to output file
 	outFile, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
@@ -315,7 +310,6 @@ func generateExampleFile(inputPath string, force bool) error {
 }
 
 func generateEnvFile(inputPath string, force bool) error {
-	// Read the input .env.example file
 	file, err := os.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to open input file: %w", err)
@@ -327,15 +321,12 @@ func generateEnvFile(inputPath string, force bool) error {
 		return fmt.Errorf("failed to parse .env.example file: %w", err)
 	}
 
-	// Determine output path
 	outputPath := filepath.Join(filepath.Dir(inputPath), ".env")
 
-	// Check if file exists and handle overwrite
 	if _, err := os.Stat(outputPath); err == nil && !force {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
 	}
 
-	// Write to output file
 	outFile, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)

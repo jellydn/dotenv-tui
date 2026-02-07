@@ -29,6 +29,7 @@ dotenv-tui fixes this with two commands:
 - Diff preview before writing `.env.example`
 - Supports `.env.local`, `.env.production`, and all `.env.*` variants
 - CLI flags for non-interactive / CI usage
+- Self-upgrade via `--upgrade` flag with checksum verification
 
 ## Install
 
@@ -70,6 +71,9 @@ dotenv-tui --generate-env .env.example
 
 # List discovered .env files
 dotenv-tui --scan
+
+# Upgrade to the latest version
+dotenv-tui --upgrade
 ```
 
 ## Development
