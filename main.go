@@ -93,11 +93,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	menuModel, menuCmd := m.menu.Update(msg)
-	menu, ok := menuModel.(tui.MenuModel)
-	if !ok {
-		return m, nil
-	}
-	m.menu = menu
+	m.menu = menuModel.(tui.MenuModel)
 	cmd := menuCmd
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
@@ -113,11 +109,7 @@ func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	pickerModel, pickerCmd := m.picker.Update(msg)
-	picker, ok := pickerModel.(tui.PickerModel)
-	if !ok {
-		return m, nil
-	}
-	m.picker = picker
+	m.picker = pickerModel.(tui.PickerModel)
 	cmd := pickerCmd
 
 	switch msg := msg.(type) {
@@ -150,11 +142,7 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	previewModel, previewCmd := m.preview.Update(msg)
-	preview, ok := previewModel.(tui.PreviewModel)
-	if !ok {
-		return m, nil
-	}
-	m.preview = preview
+	m.preview = previewModel.(tui.PreviewModel)
 	cmd := previewCmd
 
 	switch msg := msg.(type) {
@@ -172,11 +160,7 @@ func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	formModel, formCmd := m.form.Update(msg)
-	form, ok := formModel.(tui.FormModel)
-	if !ok {
-		return m, nil
-	}
-	m.form = form
+	m.form = formModel.(tui.FormModel)
 	cmd := formCmd
 
 	switch msg := msg.(type) {
@@ -508,7 +492,7 @@ func processExampleFile(exampleFile string, force bool, generated, skipped *int)
 		}
 	}
 
-	outFile, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	outFile, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create %s: %w", outputPath, err)
 	}
