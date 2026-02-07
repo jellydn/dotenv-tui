@@ -182,6 +182,186 @@ func TestScan(t *testing.T) {
 	})
 }
 
+func TestScanExamples(t *testing.T) {
+	t.Run("finds basic .env.example files", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create test structure
+		writeFile(t, tmpDir, ".env.example", "KEY=example_value")
+		writeFile(t, tmpDir, ".env", "should not match")
+		writeFile(t, tmpDir, ".env.local", "should not match")
+
+		results, err := ScanExamples(tmpDir)
+		if err != nil {
+			t.Fatalf("ScanExamples() error = %v", err)
+		}
+
+		if len(results) != 1 {
+			t.Errorf("Expected 1 file, got %d: %v", len(results), results)
+		}
+
+		if results[0] != ".env.example" {
+			t.Errorf("Expected .env.example, got %s", results[0])
+		}
+	})
+
+	t.Run("finds .env.*.example variants", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create various .env.example files
+		writeFile(t, tmpDir, ".env.example", "BASE=example")
+		writeFile(t, tmpDir, ".env.local.example", "LOCAL=example")
+		writeFile(t, tmpDir, ".env.production.example", "PROD=example")
+		writeFile(t, tmpDir, ".env.development.example", "DEV=example")
+		writeFile(t, tmpDir, ".env.test.example", "TEST=example")
+
+		// Should not match
+		writeFile(t, tmpDir, ".env", "BASE=value")
+		writeFile(t, tmpDir, ".env.local", "LOCAL=value")
+		writeFile(t, tmpDir, "env.example", "wrong prefix")
+
+		results, err := ScanExamples(tmpDir)
+		if err != nil {
+			t.Fatalf("ScanExamples() error = %v", err)
+		}
+
+		expected := []string{".env.development.example", ".env.example", ".env.local.example", ".env.production.example", ".env.test.example"}
+		if len(results) != len(expected) {
+			t.Errorf("Expected %d files, got %d: %v", len(expected), len(results), results)
+		}
+
+		// Check that all expected files are present (order doesn't matter)
+		resultMap := make(map[string]bool)
+		for _, r := range results {
+			resultMap[r] = true
+		}
+
+		for _, exp := range expected {
+			if !resultMap[exp] {
+				t.Errorf("Missing expected file: %s", exp)
+			}
+		}
+	})
+
+	t.Run("skips dependency directories", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create directory structure with dependencies
+		mkdir(t, tmpDir, "node_modules")
+		mkdir(t, tmpDir, ".git")
+		mkdir(t, tmpDir, "vendor")
+		mkdir(t, tmpDir, "dist")
+		mkdir(t, tmpDir, "build")
+		mkdir(t, tmpDir, ".next")
+		mkdir(t, tmpDir, ".nuxt")
+		mkdir(t, tmpDir, "__pycache__")
+		mkdir(t, tmpDir, "src")
+
+		// Add .env.example files in skipped directories (should not be found)
+		writeFile(t, tmpDir, "node_modules/.env.example", "NODE_ENV=example")
+		writeFile(t, tmpDir, ".git/.env.example", "GIT_ENV=example")
+		writeFile(t, tmpDir, "vendor/.env.example", "VENDOR_ENV=example")
+		writeFile(t, tmpDir, "dist/.env.example", "DIST_ENV=example")
+		writeFile(t, tmpDir, "build/.env.example", "BUILD_ENV=example")
+		writeFile(t, tmpDir, ".next/.env.example", "NEXT_ENV=example")
+		writeFile(t, tmpDir, ".nuxt/.env.example", "NUXT_ENV=example")
+		writeFile(t, tmpDir, "__pycache__/.env.example", "PYTHON_ENV=example")
+
+		// Add .env.example file in regular directory (should be found)
+		writeFile(t, tmpDir, "src/.env.example", "SRC_ENV=example")
+		writeFile(t, tmpDir, ".env.example", "ROOT_ENV=example")
+
+		results, err := ScanExamples(tmpDir)
+		if err != nil {
+			t.Fatalf("ScanExamples() error = %v", err)
+		}
+
+		expected := []string{".env.example", "src/.env.example"}
+		if len(results) != len(expected) {
+			t.Errorf("Expected %d files, got %d: %v", len(expected), len(results), results)
+		}
+
+		// Check that files from skipped directories are not present
+		for _, r := range results {
+			if strings.Contains(r, "node_modules") ||
+				strings.Contains(r, ".git") ||
+				strings.Contains(r, "vendor") ||
+				strings.Contains(r, "dist") ||
+				strings.Contains(r, "build") ||
+				strings.Contains(r, ".next") ||
+				strings.Contains(r, ".nuxt") ||
+				strings.Contains(r, "__pycache__") {
+				t.Errorf("Found file in skipped directory: %s", r)
+			}
+		}
+	})
+
+	t.Run("nested directories", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create nested structure
+		mkdir(t, tmpDir, "frontend")
+		mkdir(t, tmpDir, "frontend/components")
+		mkdir(t, tmpDir, "backend")
+		mkdir(t, tmpDir, "backend/api")
+		mkdir(t, tmpDir, "backend/api/v1")
+
+		// Add .env.example files at various levels
+		writeFile(t, tmpDir, ".env.example", "ROOT=example")
+		writeFile(t, tmpDir, "frontend/.env.example", "FRONTEND=example")
+		writeFile(t, tmpDir, "frontend/components/.env.example", "COMPONENTS=example")
+		writeFile(t, tmpDir, "backend/.env.example", "BACKEND=example")
+		writeFile(t, tmpDir, "backend/api/.env.example", "API=example")
+		writeFile(t, tmpDir, "backend/api/v1/.env.example", "API_V1=example")
+
+		// Add non-example files (should not be found)
+		writeFile(t, tmpDir, ".env", "ROOT=value")
+		writeFile(t, tmpDir, "frontend/.env.local", "FRONTEND=local")
+
+		results, err := ScanExamples(tmpDir)
+		if err != nil {
+			t.Fatalf("ScanExamples() error = %v", err)
+		}
+
+		expected := []string{
+			".env.example",
+			"frontend/.env.example",
+			"frontend/components/.env.example",
+			"backend/.env.example",
+			"backend/api/.env.example",
+			"backend/api/v1/.env.example",
+		}
+
+		if len(results) != len(expected) {
+			t.Errorf("Expected %d files, got %d: %v", len(expected), len(results), results)
+		}
+
+		resultMap := make(map[string]bool)
+		for _, r := range results {
+			resultMap[r] = true
+		}
+
+		for _, exp := range expected {
+			if !resultMap[exp] {
+				t.Errorf("Missing expected file: %s", exp)
+			}
+		}
+	})
+
+	t.Run("empty directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		results, err := ScanExamples(tmpDir)
+		if err != nil {
+			t.Fatalf("ScanExamples() error = %v", err)
+		}
+
+		if len(results) != 0 {
+			t.Errorf("Expected 0 files, got %d: %v", len(results), results)
+		}
+	})
+}
+
 // Helper functions for test setup
 func writeFile(t *testing.T, base, name, content string) {
 	t.Helper()

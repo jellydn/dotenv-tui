@@ -15,18 +15,18 @@ import (
 	"github.com/jellydn/dotenv-tui/internal/upgrade"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// Version is set at build time via ldflags, or read from module info when using go install
 var Version = ""
 
-// getVersion returns the version string, checking build info first, then falling back to ldflags
+// getVersion returns the version of the application.
+// It checks the Version variable first, then falls back to build info.
 func getVersion() string {
 	if Version != "" {
 		return Version
 	}
 
-	// Try to get version from build info (works with go install)
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if info.Main.Version != "" && info.Main.Version != "(devel)" {
 			return info.Main.Version
@@ -42,6 +42,9 @@ type model struct {
 	picker        tui.PickerModel
 	preview       tui.PreviewModel
 	form          tui.FormModel
+	fileList      []string
+	fileIndex     int
+	pickerMode    tui.MenuChoice
 }
 
 type screen int
@@ -51,8 +54,10 @@ const (
 	pickerScreen
 	previewScreen
 	formScreen
+	doneScreen
 )
 
+// initialModel creates and returns the initial model state for the application.
 func initialModel() model {
 	return model{
 		currentScreen: menuScreen,
@@ -74,10 +79,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return updatePreview(msg, m)
 	case formScreen:
 		return updateForm(msg, m)
+	case doneScreen:
+		return updateDone(msg, m)
 	}
 	return m, nil
 }
 
+// updateMenu handles messages for the menu screen.
 func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	menuModel, menuCmd := m.menu.Update(msg)
@@ -94,6 +102,7 @@ func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// updatePicker handles messages for the file picker screen.
 func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	pickerModel, pickerCmd := m.picker.Update(msg)
@@ -102,28 +111,33 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tui.PickerFinishedMsg:
-		if msg.Mode == tui.GenerateExample && len(msg.Selected) > 0 {
-			m.currentScreen = previewScreen
-			return m, tui.NewPreviewModel(msg.Selected[0], nil)
-		}
-		if msg.Mode == tui.GenerateEnv && len(msg.Selected) > 0 {
-			m.currentScreen = formScreen
-			return m, tui.NewFormModel(msg.Selected[0])
+		if len(msg.Selected) > 0 {
+			m.fileList = msg.Selected
+			m.fileIndex = 0
+			m.pickerMode = msg.Mode
+
+			if msg.Mode == tui.GenerateExample {
+				m.currentScreen = previewScreen
+				return m, tui.NewPreviewModel(msg.Selected[0], 0, len(msg.Selected))
+			}
+			if msg.Mode == tui.GenerateEnv {
+				m.currentScreen = formScreen
+				return m, tui.NewFormModel(msg.Selected[0], 0, len(msg.Selected))
+			}
 		}
 		m.currentScreen = menuScreen
 		m.menu = tui.NewMenuModel()
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			m.currentScreen = menuScreen
-			m.menu = tui.NewMenuModel()
-			return m, nil
+			return returnToMenu(m), nil
 		}
 	}
 
 	return m, cmd
 }
 
+// updatePreview handles messages for the preview screen.
 func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	previewModel, previewCmd := m.preview.Update(msg)
@@ -132,20 +146,18 @@ func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tui.PreviewFinishedMsg:
-		m.currentScreen = menuScreen
-		m.menu = tui.NewMenuModel()
+		m.currentScreen = doneScreen
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			m.currentScreen = menuScreen
-			m.menu = tui.NewMenuModel()
-			return m, nil
+			return returnToMenu(m), nil
 		}
 	}
 
 	return m, cmd
 }
 
+// updateForm handles messages for the form screen.
 func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	formModel, formCmd := m.form.Update(msg)
@@ -154,18 +166,84 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tui.FormFinishedMsg:
-		m.currentScreen = menuScreen
-		m.menu = tui.NewMenuModel()
+		m.currentScreen = doneScreen
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
-			m.currentScreen = menuScreen
-			m.menu = tui.NewMenuModel()
-			return m, nil
+			return returnToMenu(m), nil
 		}
 	}
 
 	return m, cmd
+}
+
+// navigateToFile transitions to the appropriate screen (preview or form)
+// for the current file index in the file list.
+func (m *model) navigateToFile() (tea.Model, tea.Cmd) {
+	if m.pickerMode == tui.GenerateExample {
+		m.currentScreen = previewScreen
+		return *m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+	}
+	m.currentScreen = formScreen
+	return *m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+}
+
+// returnToMenu returns the model to the menu screen, resetting any state.
+func returnToMenu(m model) tea.Model {
+	m.currentScreen = menuScreen
+	m.menu = tui.NewMenuModel()
+	return m
+}
+
+// updateDone handles messages for the done/completion screen.
+// It supports Tab/Shift+Tab navigation between files.
+func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
+		case "tab":
+			if len(m.fileList) > 1 {
+				m.fileIndex = (m.fileIndex + 1) % len(m.fileList)
+				return m.navigateToFile()
+			}
+		case "shift+tab":
+			if len(m.fileList) > 1 {
+				m.fileIndex = (m.fileIndex - 1 + len(m.fileList)) % len(m.fileList)
+				return m.navigateToFile()
+			}
+		case "q", "esc":
+			return returnToMenu(m), nil
+		}
+	}
+	return m, nil
+}
+
+// viewDone renders the completion screen view showing the status
+// of processed files with navigation options.
+func (m model) viewDone() string {
+	var title string
+	if m.pickerMode == tui.GenerateExample {
+		title = ".env.example Generation Complete"
+	} else {
+		title = ".env Generation Complete"
+	}
+
+	currentFile := ""
+	if len(m.fileList) > 0 {
+		currentFile = m.fileList[m.fileIndex]
+	}
+
+	status := fmt.Sprintf("Processed: %s [%d/%d]", currentFile, m.fileIndex+1, len(m.fileList))
+	help := "q: back to menu"
+	if len(m.fileList) > 1 {
+		help = "Tab: next file • Shift+Tab: previous file • q: back to menu"
+	}
+
+	return fmt.Sprintf(
+		"\n%s\n\n%s\n\n%s\n",
+		lipgloss.NewStyle().Bold(true).Render(title),
+		status,
+		lipgloss.NewStyle().Faint(true).Render(help),
+	)
 }
 
 func (m model) View() string {
@@ -178,6 +256,8 @@ func (m model) View() string {
 		return m.preview.View()
 	case formScreen:
 		return m.form.View()
+	case doneScreen:
+		return m.viewDone()
 	default:
 		return ""
 	}
@@ -275,7 +355,9 @@ EXAMPLES:
 `)
 }
 
-func generateExampleFile(inputPath string, force bool) error {
+type entryProcessor func([]parser.Entry) []parser.Entry
+
+func generateFile(inputPath string, force bool, outputFilename string, processEntries entryProcessor, parseErrMsg string) error {
 	file, err := os.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to open input file: %w", err)
@@ -284,12 +366,12 @@ func generateExampleFile(inputPath string, force bool) error {
 
 	entries, err := parser.Parse(file)
 	if err != nil {
-		return fmt.Errorf("failed to parse .env file: %w", err)
+		return fmt.Errorf("failed to parse %s: %w", parseErrMsg, err)
 	}
 
-	exampleEntries := generator.GenerateExample(entries)
+	processedEntries := processEntries(entries)
 
-	outputPath := filepath.Join(filepath.Dir(inputPath), ".env.example")
+	outputPath := filepath.Join(filepath.Dir(inputPath), outputFilename)
 
 	if _, err := os.Stat(outputPath); err == nil && !force {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
@@ -301,7 +383,7 @@ func generateExampleFile(inputPath string, force bool) error {
 	}
 	defer func() { _ = outFile.Close() }()
 
-	if err := parser.Write(outFile, exampleEntries); err != nil {
+	if err := parser.Write(outFile, processedEntries); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
@@ -309,36 +391,14 @@ func generateExampleFile(inputPath string, force bool) error {
 	return nil
 }
 
+func generateExampleFile(inputPath string, force bool) error {
+	return generateFile(inputPath, force, ".env.example", generator.GenerateExample, ".env file")
+}
+
 func generateEnvFile(inputPath string, force bool) error {
-	file, err := os.Open(inputPath)
-	if err != nil {
-		return fmt.Errorf("failed to open input file: %w", err)
-	}
-	defer func() { _ = file.Close() }()
-
-	entries, err := parser.Parse(file)
-	if err != nil {
-		return fmt.Errorf("failed to parse .env.example file: %w", err)
-	}
-
-	outputPath := filepath.Join(filepath.Dir(inputPath), ".env")
-
-	if _, err := os.Stat(outputPath); err == nil && !force {
-		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
-	}
-
-	outFile, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer func() { _ = outFile.Close() }()
-
-	if err := parser.Write(outFile, entries); err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
-	}
-
-	fmt.Printf("Generated %s\n", outputPath)
-	return nil
+	return generateFile(inputPath, force, ".env", func(entries []parser.Entry) []parser.Entry {
+		return entries
+	}, ".env.example file")
 }
 
 func scanAndList(dir string) error {

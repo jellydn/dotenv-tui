@@ -175,3 +175,97 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Linting requires removing unused fields and avoiding empty branches in Go
   - Bubble Tea models work well with message-based initialization for async operations
 ---
+
+## [2026-02-07 07:15] - US-011
+[Session: https://opncd.ai/s/placeholder]
+- Implemented ScanExamples function for .env.example file discovery with comprehensive unit tests
+- Added ScanExamples() function that returns only .env.example and .env.*.example files
+- ScanExamples skips the same dependency directories as the existing Scan function
+- Created isExampleFile() helper function to match .env.example and .env.*.example patterns
+- Comprehensive unit tests covering all acceptance criteria with temp directory structures
+- All existing Scan() behavior remains unchanged (still excludes .example files)
+- Files changed: internal/scanner/scanner.go, internal/scanner/scanner_test.go
+- **Learnings for future iterations:**
+  - When adding new scanning functions, reuse existing patterns like skipDirs map and directory traversal logic
+  - isExampleFile() function uses simple string prefix/suffix matching for .env.example patterns
+  - Table-driven tests with subtests work well for validating scanner behavior with temp directories
+  - Map lookup for skip directories is efficient and maintainable across multiple scan functions
+  - Use consistent error handling patterns across similar functions
+---
+
+## [2026-02-07 13:15] - US-013
+[Session: https://opncd.ai/s/placeholder]
+- Implemented directory grouping with visual headers in the file picker
+- Created pickerItem struct with isHeader bool to distinguish directory headers from selectable files
+- Files are grouped by filepath.Dir() with non-selectable directory headers rendered above each group
+- Directory headers are styled differently (dimmed and bold) and cursor skips them during navigation
+- Files within each group are sorted alphabetically, and groups are sorted alphabetically by directory path
+- Space and 'a' keybindings only affect selectable file items, not headers
+- Added comprehensive unit tests for the new groupFilesByDirectory function
+- Files changed: internal/tui/picker.go, internal/tui/picker_test.go
+- **Learnings for future iterations:**
+  - When implementing visual grouping, use struct composition to distinguish between different item types (headers vs selectable items)
+  - findNextSelectableItem helper function is essential for proper cursor navigation when dealing with mixed item types
+  - Directory path grouping with filepath.Dir() works well - use "Current Directory" for files in the root directory for better UX
+  - Use sort.Strings() for both directories and files within directories to ensure consistent ordering
+  - Map iteration order is not guaranteed - tests should not rely on specific order when working with maps
+  - Test both the grouping logic (groupFilesByDirectory) and the integration with the full picker model
+  - Lipgloss styling makes headers visually distinct - use different styles for headers vs selectable items
+  - When modifying complex structures like the picker, comprehensive test coverage is essential to prevent regressions
+---
+
+## [2026-02-07 13:45] - US-014
+[Session: https://opncd.ai/s/placeholder]
+- Implemented sequential file processing with Tab/Shift+Tab navigation for improved workflow efficiency
+- Added doneScreen to screen enum and created updateDone handler with wrap-around navigation logic
+- Updated main model struct to include fileList []string, fileIndex int, and pickerMode fields for state management
+- Modified updatePicker to store selected files and mode when PickerFinishedMsg is received
+- Created viewDone function to show status bar with current file position and navigation help
+- Updated updatePreview and updateForm to transition to doneScreen instead of menuScreen after processing
+- Fixed linting issues: converted single-case switch to if statement and removed ineffectual assignment
+- Files changed: main.go, scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - When implementing sequential navigation, add state fields (fileList, fileIndex) to track current position
+  - Done screen pattern works well for multi-file workflows - shows status and navigation options
+  - Wrap-around navigation (modulo arithmetic) provides smooth user experience at boundaries
+  - Tab/Shift+Tab navigation should be isolated to specific screens to avoid conflicts with form navigation
+  - Use separate updateX and viewX functions for each screen to maintain clean separation of concerns
+  - Lipgloss styling improves UI consistency across different screen types
+  - Gocritic and ineffassign linters catch code quality issues - always fix before committing
+---
+
+## [2026-02-07 14:15] - US-015
+[Session: https://opncd.ai/s/placeholder]
+- Implemented file path and position counter display on preview and form screens
+- Added fileIndex and totalFiles fields to PreviewModel and FormModel structs
+- Updated NewPreviewModel and NewFormModel functions to accept file index and total count parameters
+- Modified View methods to show position counter in format '[current/total] filepath'
+- Updated main.go to pass file index and total count when creating models and during Tab/Shift+Tab navigation
+- Ensured counter updates correctly when navigating between files
+- Files changed: internal/tui/preview.go, internal/tui/form.go, main.go, scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - When implementing position counters, add fields to model structs and pass them through init functions
+  - Update all calls to model constructors to include new parameters consistently
+  - Position counter format '[current/total] filepath' provides clear user feedback
+  - Use separate formInitMsg and previewInitMsg types to pass additional init data to models
+  - View methods should display position information consistently across different screen types
+  - Tab/Shift+Tab navigation requires updating file index before recreating models with new positions
+  - All model creation calls must be updated when adding new parameters to avoid compilation errors
+---
+
+## [2026-02-07 07:20] - US-012
+[Session: https://opncd.ai/s/placeholder]
+- Updated picker to default to no selection and filter files by mode with comprehensive functionality
+- Modified NewPickerModel() to call scanner.Scan() for GenerateExample and scanner.ScanExamples() for GenerateEnv
+- Changed initialization to select no files by default (selected map with all false values)
+- Updated UI text dynamically based on mode: titles, no-files messages, single-file indicators
+- Modified Enter key handler to only proceed when at least one file is selected
+- Maintained existing space toggle and 'a' key toggle all functionality for both modes
+- Files changed: internal/tui/picker.go
+- **Learnings for future iterations:**
+  - When implementing mode-dependent behavior, use switch statements on the mode enum for clarity
+  - Dynamic UI text improves UX by showing relevant messages for each mode
+  - Initialize maps with explicit values (false) rather than relying on zero values for clarity
+  - Guard clauses in event handlers prevent unintended transitions (no selection check)
+  - Reuse existing scanner functions rather than duplicating scanning logic
+---

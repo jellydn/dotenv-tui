@@ -33,6 +33,8 @@ type FormModel struct {
 	confirmed       bool
 	errorMsg        string
 	successMsg      string
+	fileIndex       int
+	totalFiles      int
 }
 
 // FormFinishedMsg signals the form has completed with success status.
@@ -45,16 +47,20 @@ type formInitMsg struct {
 	fields          []FormField
 	originalEntries []parser.Entry
 	filePath        string
+	fileIndex       int
+	totalFiles      int
 }
 
 // NewFormModel creates a new form model for collecting environment variables.
-func NewFormModel(exampleFilePath string) tea.Cmd {
+func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 	return func() tea.Msg {
 		file, err := os.Open(exampleFilePath)
 		if err != nil {
 			return formInitMsg{
-				filePath: exampleFilePath,
-				fields:   []FormField{},
+				filePath:   exampleFilePath,
+				fields:     []FormField{},
+				fileIndex:  fileIndex,
+				totalFiles: totalFiles,
 			}
 		}
 		defer func() { _ = file.Close() }()
@@ -62,8 +68,10 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 		entries, err := parser.Parse(file)
 		if err != nil {
 			return formInitMsg{
-				filePath: exampleFilePath,
-				fields:   []FormField{},
+				filePath:   exampleFilePath,
+				fields:     []FormField{},
+				fileIndex:  fileIndex,
+				totalFiles: totalFiles,
 			}
 		}
 
@@ -98,10 +106,15 @@ func NewFormModel(exampleFilePath string) tea.Cmd {
 			fields:          fields,
 			originalEntries: entries,
 			filePath:        exampleFilePath,
+			fileIndex:       fileIndex,
+			totalFiles:      totalFiles,
 		}
 	}
 }
 
+// isPlaceholderValue returns true if the value appears to be a placeholder.
+// It checks for common placeholder patterns like *** suffix, "your_*" prefix,
+// and words like "placeholder" or "example" in the value.
 func isPlaceholderValue(value string) bool {
 	if strings.HasSuffix(value, "***") {
 		return true
@@ -122,6 +135,8 @@ func isPlaceholderValue(value string) bool {
 	return false
 }
 
+// generateHint creates a context-aware placeholder hint for a given key.
+// It maps common key patterns to appropriate user-friendly hints.
 func generateHint(key, _ string) string {
 	lowerKey := strings.ToLower(key)
 
@@ -159,6 +174,13 @@ func (m FormModel) Init() tea.Cmd {
 // moveCursor moves the cursor and updates scroll position
 const visibleFields = 7
 
+const (
+	directionUp   = -1
+	directionDown = 1
+)
+
+// moveCursor moves the cursor to a new position and updates the scroll offset
+// to keep the cursor visible within the visible fields window.
 func (m *FormModel) moveCursor(newCursor int) {
 	m.fields[m.cursor].Input.Blur()
 	m.cursor = newCursor
@@ -171,6 +193,15 @@ func (m *FormModel) moveCursor(newCursor int) {
 	}
 }
 
+// moveCursorByDirection moves the cursor by the specified direction (up or down).
+// It clamps the movement to stay within the bounds of available fields.
+func (m *FormModel) moveCursorByDirection(dir int) {
+	newCursor := m.cursor + dir
+	if newCursor >= 0 && newCursor < len(m.fields) {
+		m.moveCursor(newCursor)
+	}
+}
+
 // Update handles messages and updates the form model.
 func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -178,6 +209,8 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.fields = msg.fields
 		m.originalEntries = msg.originalEntries
 		m.filePath = msg.filePath
+		m.fileIndex = msg.fileIndex
+		m.totalFiles = msg.totalFiles
 
 		// Set focus on first field if there are any
 		if len(m.fields) > 0 {
@@ -210,31 +243,17 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "up", "k":
-			if m.cursor > 0 {
-				m.moveCursor(m.cursor - 1)
-			}
-		case "down", "j":
-			if m.cursor < len(m.fields)-1 {
-				m.moveCursor(m.cursor + 1)
-			}
-		case "tab":
-			if m.cursor < len(m.fields)-1 {
-				m.moveCursor(m.cursor + 1)
-			}
-		case "shift+tab":
-			if m.cursor > 0 {
-				m.moveCursor(m.cursor - 1)
-			}
+		case "up", "k", "shift+tab":
+			m.moveCursorByDirection(directionUp)
+		case "down", "j", "tab":
+			m.moveCursorByDirection(directionDown)
 		case "ctrl+s":
 			return m, m.saveForm()
 		case "enter":
 			if m.cursor == len(m.fields)-1 {
 				return m, m.saveForm()
 			}
-			if m.cursor < len(m.fields)-1 {
-				m.moveCursor(m.cursor + 1)
-			}
+			m.moveCursorByDirection(directionDown)
 		case "q", "esc":
 			return m, func() tea.Msg {
 				return FormFinishedMsg{Success: false, Error: "cancelled"}
@@ -252,6 +271,8 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// saveForm processes the form fields and writes the resulting .env file.
+// It returns a command that emits a FormFinishedMsg upon completion.
 func (m FormModel) saveForm() tea.Cmd {
 	return func() tea.Msg {
 		outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
@@ -341,9 +362,10 @@ func (m FormModel) View() string {
 		Bold(true).
 		Render("Edit Environment Variables")
 
+	positionText := fmt.Sprintf("[%d/%d] %s", m.fileIndex+1, m.totalFiles, m.filePath)
 	subtitle := lipgloss.NewStyle().
 		Faint(true).
-		Render(fmt.Sprintf("Editing: %s", m.filePath))
+		Render(positionText)
 
 	var form strings.Builder
 

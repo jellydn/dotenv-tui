@@ -24,6 +24,9 @@ type PreviewModel struct {
 	outputPath       string
 	confirmed        bool
 	success          bool
+	fileIndex        int
+	totalFiles       int
+	filePath         string
 }
 
 // PreviewFinishedMsg signals the preview has completed with success status.
@@ -32,7 +35,7 @@ type PreviewFinishedMsg struct {
 }
 
 // NewPreviewModel creates a preview for the generated .env.example output.
-func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
+func NewPreviewModel(filePath string, fileIndex, totalFiles int) tea.Cmd {
 	return func() tea.Msg {
 		file, err := os.Open(filePath)
 		if err != nil {
@@ -41,6 +44,9 @@ func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 				generatedEntries: []parser.Entry{},
 				diffLines:        []string{fmt.Sprintf("Error reading file: %v", err)},
 				outputPath:       filepath.Join(filepath.Dir(filePath), ".env.example"),
+				fileIndex:        fileIndex,
+				totalFiles:       totalFiles,
+				filePath:         filePath,
 			}
 		}
 		defer func() { _ = file.Close() }()
@@ -52,6 +58,9 @@ func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 				generatedEntries: []parser.Entry{},
 				diffLines:        []string{fmt.Sprintf("Error parsing file: %v", err)},
 				outputPath:       filepath.Join(filepath.Dir(filePath), ".env.example"),
+				fileIndex:        fileIndex,
+				totalFiles:       totalFiles,
+				filePath:         filePath,
 			}
 		}
 
@@ -78,6 +87,9 @@ func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 			generatedEntries: generatedEntries,
 			diffLines:        diffLines,
 			outputPath:       outputPath,
+			fileIndex:        fileIndex,
+			totalFiles:       totalFiles,
+			filePath:         filePath,
 		}
 	}
 }
@@ -87,8 +99,12 @@ type previewInitMsg struct {
 	generatedEntries []parser.Entry
 	diffLines        []string
 	outputPath       string
+	fileIndex        int
+	totalFiles       int
+	filePath         string
 }
 
+// entryToString converts a parser Entry to its string representation.
 func entryToString(entry parser.Entry) string {
 	switch e := entry.(type) {
 	case parser.KeyValue:
@@ -119,6 +135,8 @@ func (m PreviewModel) Init() tea.Cmd {
 
 const visibleDiffLines = 10
 
+// adjustScroll ensures the cursor remains visible by adjusting scrollOffset
+// when the cursor moves outside the currently visible area.
 func (m *PreviewModel) adjustScroll() {
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
@@ -135,6 +153,9 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.generatedEntries = msg.generatedEntries
 		m.diffLines = msg.diffLines
 		m.outputPath = msg.outputPath
+		m.fileIndex = msg.fileIndex
+		m.totalFiles = msg.totalFiles
+		m.filePath = msg.filePath
 		return m, nil
 
 	case tea.KeyMsg:
@@ -184,6 +205,7 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// writeFile writes the generated entries to the output .env.example file.
 func (m PreviewModel) writeFile() error {
 	file, err := os.Create(m.outputPath)
 	if err != nil {
@@ -196,12 +218,17 @@ func (m PreviewModel) writeFile() error {
 
 // View renders the diff preview UI.
 func (m PreviewModel) View() string {
+	positionText := fmt.Sprintf("[%d/%d] %s", m.fileIndex+1, m.totalFiles, m.filePath)
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#FAFAFA")).
 		Background(lipgloss.Color("#7D56F4")).
 		Padding(0, 1).
 		Render("Preview .env.example generation")
+
+	position := lipgloss.NewStyle().
+		Faint(true).
+		Render(positionText)
 
 	if m.confirmed && m.success {
 		successMsg := lipgloss.NewStyle().
@@ -213,7 +240,7 @@ func (m PreviewModel) View() string {
 			Faint(true).
 			Render("Press Enter to continue")
 
-		return "\n" + title + "\n\n" + successMsg + "\n\n" + continueMsg + "\n"
+		return "\n" + title + "\n" + position + "\n\n" + successMsg + "\n\n" + continueMsg + "\n"
 	}
 
 	if m.confirmed {
@@ -225,7 +252,7 @@ func (m PreviewModel) View() string {
 			Faint(true).
 			Render("Y/Enter: yes • N: no • Q/Esc: cancel")
 
-		return "\n" + title + "\n\n" + confirmMsg + "\n\n" + help + "\n"
+		return "\n" + title + "\n" + position + "\n\n" + confirmMsg + "\n\n" + help + "\n"
 	}
 
 	var diff strings.Builder
@@ -267,5 +294,5 @@ func (m PreviewModel) View() string {
 		Faint(true).
 		Render("↑/k: up • ↓/j: down • Enter: confirm • Q/Esc: cancel")
 
-	return "\n" + title + "\n\n" + diff.String() + "\n" + help + "\n"
+	return "\n" + title + "\n" + position + "\n\n" + diff.String() + "\n" + help + "\n"
 }
