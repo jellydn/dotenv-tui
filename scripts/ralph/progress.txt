@@ -234,6 +234,25 @@ Started: Sat Feb  7 00:24:50 +08 2026
   - Gocritic and ineffassign linters catch code quality issues - always fix before committing
 ---
 
+## [2026-02-07 14:15] - US-015
+[Session: https://opncd.ai/s/placeholder]
+- Implemented file path and position counter display on preview and form screens
+- Added fileIndex and totalFiles fields to PreviewModel and FormModel structs
+- Updated NewPreviewModel and NewFormModel functions to accept file index and total count parameters
+- Modified View methods to show position counter in format '[current/total] filepath'
+- Updated main.go to pass file index and total count when creating models and during Tab/Shift+Tab navigation
+- Ensured counter updates correctly when navigating between files
+- Files changed: internal/tui/preview.go, internal/tui/form.go, main.go, scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - When implementing position counters, add fields to model structs and pass them through init functions
+  - Update all calls to model constructors to include new parameters consistently
+  - Position counter format '[current/total] filepath' provides clear user feedback
+  - Use separate formInitMsg and previewInitMsg types to pass additional init data to models
+  - View methods should display position information consistently across different screen types
+  - Tab/Shift+Tab navigation requires updating file index before recreating models with new positions
+  - All model creation calls must be updated when adding new parameters to avoid compilation errors
+---
+
 ## [2026-02-07 07:20] - US-012
 [Session: https://opncd.ai/s/placeholder]
 - Updated picker to default to no selection and filter files by mode with comprehensive functionality
