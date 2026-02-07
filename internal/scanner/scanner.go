@@ -19,6 +19,8 @@ var skipDirs = map[string]bool{
 	"__pycache__":  true,
 }
 
+// scanFiles is a helper function that walks a directory tree and collects files
+// matching the provided predicate function.
 func scanFiles(root string, match func(fileName string) bool) ([]string, error) {
 	var files []string
 
@@ -71,6 +73,8 @@ func ScanExamples(root string) ([]string, error) {
 	return scanFiles(root, isExampleFile)
 }
 
+// isEnvFile returns true if the filename represents a .env file.
+// It excludes .env.example files and only matches .env or .env.* patterns.
 func isEnvFile(fileName string) bool {
 	if strings.HasSuffix(fileName, ".example") {
 		return false
@@ -79,6 +83,7 @@ func isEnvFile(fileName string) bool {
 	return strings.HasPrefix(fileName, ".env") && (fileName == ".env" || (len(fileName) > 4 && fileName[4] == '.'))
 }
 
+// isExampleFile returns true if the filename represents a .env.example file.
 func isExampleFile(fileName string) bool {
 	return strings.HasPrefix(fileName, ".env") && strings.HasSuffix(fileName, ".example")
 }

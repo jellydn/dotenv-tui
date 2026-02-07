@@ -104,6 +104,7 @@ type previewInitMsg struct {
 	filePath         string
 }
 
+// entryToString converts a parser Entry to its string representation.
 func entryToString(entry parser.Entry) string {
 	switch e := entry.(type) {
 	case parser.KeyValue:
@@ -134,6 +135,8 @@ func (m PreviewModel) Init() tea.Cmd {
 
 const visibleDiffLines = 10
 
+// adjustScroll ensures the cursor remains visible by adjusting scrollOffset
+// when the cursor moves outside the currently visible area.
 func (m *PreviewModel) adjustScroll() {
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
@@ -202,6 +205,7 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// writeFile writes the generated entries to the output .env.example file.
 func (m PreviewModel) writeFile() error {
 	file, err := os.Create(m.outputPath)
 	if err != nil {

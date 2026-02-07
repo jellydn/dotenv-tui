@@ -20,6 +20,8 @@ import (
 
 var Version = ""
 
+// getVersion returns the version of the application.
+// It checks the Version variable first, then falls back to build info.
 func getVersion() string {
 	if Version != "" {
 		return Version
@@ -55,6 +57,7 @@ const (
 	doneScreen
 )
 
+// initialModel creates and returns the initial model state for the application.
 func initialModel() model {
 	return model{
 		currentScreen: menuScreen,
@@ -82,6 +85,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateMenu handles messages for the menu screen.
 func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	menuModel, menuCmd := m.menu.Update(msg)
@@ -98,6 +102,7 @@ func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// updatePicker handles messages for the file picker screen.
 func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	pickerModel, pickerCmd := m.picker.Update(msg)
@@ -132,6 +137,7 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// updatePreview handles messages for the preview screen.
 func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	previewModel, previewCmd := m.preview.Update(msg)
@@ -151,6 +157,7 @@ func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// updateForm handles messages for the form screen.
 func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	formModel, formCmd := m.form.Update(msg)
@@ -170,6 +177,8 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// navigateToFile transitions to the appropriate screen (preview or form)
+// for the current file index in the file list.
 func (m *model) navigateToFile() (tea.Model, tea.Cmd) {
 	if m.pickerMode == tui.GenerateExample {
 		m.currentScreen = previewScreen
@@ -179,12 +188,15 @@ func (m *model) navigateToFile() (tea.Model, tea.Cmd) {
 	return *m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
 }
 
+// returnToMenu returns the model to the menu screen, resetting any state.
 func returnToMenu(m model) tea.Model {
 	m.currentScreen = menuScreen
 	m.menu = tui.NewMenuModel()
 	return m
 }
 
+// updateDone handles messages for the done/completion screen.
+// It supports Tab/Shift+Tab navigation between files.
 func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
@@ -205,6 +217,8 @@ func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// viewDone renders the completion screen view showing the status
+// of processed files with navigation options.
 func (m model) viewDone() string {
 	var title string
 	if m.pickerMode == tui.GenerateExample {

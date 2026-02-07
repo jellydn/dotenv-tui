@@ -33,6 +33,8 @@ type PickerFinishedMsg struct {
 	Mode     MenuChoice
 }
 
+// groupFilesByDirectory organizes files into a list of pickerItem structs,
+// grouping them by their parent directory with non-selectable headers.
 func groupFilesByDirectory(files []string) []pickerItem {
 	dirGroups := make(map[string][]string)
 	for _, file := range files {
@@ -116,6 +118,8 @@ func (m PickerModel) Init() tea.Cmd {
 	return nil
 }
 
+// findNextSelectableItem finds the next item in the given direction
+// that is not a header, starting from the given index.
 func (m PickerModel) findNextSelectableItem(from int, direction int) int {
 	for i := from; i >= 0 && i < len(m.items); i += direction {
 		if !m.items[i].isHeader {

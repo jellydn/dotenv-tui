@@ -112,6 +112,9 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 	}
 }
 
+// isPlaceholderValue returns true if the value appears to be a placeholder.
+// It checks for common placeholder patterns like *** suffix, "your_*" prefix,
+// and words like "placeholder" or "example" in the value.
 func isPlaceholderValue(value string) bool {
 	if strings.HasSuffix(value, "***") {
 		return true
@@ -132,6 +135,8 @@ func isPlaceholderValue(value string) bool {
 	return false
 }
 
+// generateHint creates a context-aware placeholder hint for a given key.
+// It maps common key patterns to appropriate user-friendly hints.
 func generateHint(key, _ string) string {
 	lowerKey := strings.ToLower(key)
 
@@ -174,6 +179,8 @@ const (
 	directionDown = 1
 )
 
+// moveCursor moves the cursor to a new position and updates the scroll offset
+// to keep the cursor visible within the visible fields window.
 func (m *FormModel) moveCursor(newCursor int) {
 	m.fields[m.cursor].Input.Blur()
 	m.cursor = newCursor
@@ -186,6 +193,8 @@ func (m *FormModel) moveCursor(newCursor int) {
 	}
 }
 
+// moveCursorByDirection moves the cursor by the specified direction (up or down).
+// It clamps the movement to stay within the bounds of available fields.
 func (m *FormModel) moveCursorByDirection(dir int) {
 	newCursor := m.cursor + dir
 	if newCursor >= 0 && newCursor < len(m.fields) {
@@ -262,6 +271,8 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// saveForm processes the form fields and writes the resulting .env file.
+// It returns a command that emits a FormFinishedMsg upon completion.
 func (m FormModel) saveForm() tea.Cmd {
 	return func() tea.Msg {
 		outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
