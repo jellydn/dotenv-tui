@@ -10,14 +10,14 @@ import (
 	"runtime/debug"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/jellydn/dotenv-tui/internal/generator"
 	"github.com/jellydn/dotenv-tui/internal/parser"
 	"github.com/jellydn/dotenv-tui/internal/scanner"
 	"github.com/jellydn/dotenv-tui/internal/tui"
 	"github.com/jellydn/dotenv-tui/internal/upgrade"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 var Version = ""
@@ -354,11 +354,13 @@ FLAGS:
 EXAMPLES:
     dotenv-tui                                    # Launch interactive TUI
     dotenv-tui --generate-example .env            # Generate .env.example from .env
-    dotenv-tui --generate-env .env.example       # Generate .env from .env.example
+    dotenv-tui --generate-env .env.example        # Generate .env from .env.example
     dotenv-tui --scan                             # Scan current directory for .env files
     dotenv-tui --scan ./myproject                 # Scan specific directory
+    dotenv-tui --yolo                             # Auto-generate .env from all .env.example files
+    dotenv-tui --yolo --force                     # Force overwrite existing .env files
     dotenv-tui --upgrade                          # Upgrade to the latest version
-`)
+ `)
 }
 
 type entryProcessor func([]parser.Entry) []parser.Entry
@@ -463,11 +465,15 @@ func processExampleFile(exampleFile string, force bool, generated, skipped *int)
 	if err != nil {
 		return fmt.Errorf("failed to open %s: %w", exampleFile, err)
 	}
-	defer func() { _ = file.Close() }()
 
 	entries, err := parser.Parse(file)
 	if err != nil {
+		_ = file.Close()
 		return fmt.Errorf("failed to parse %s: %w", exampleFile, err)
+	}
+
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close %s: %w", exampleFile, err)
 	}
 
 	if _, err := os.Stat(outputPath); err == nil && !force {
