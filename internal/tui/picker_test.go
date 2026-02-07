@@ -1,13 +1,14 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestPickerModelInit(t *testing.T) {
-	// Arrange
 	model := PickerModel{
 		items: []pickerItem{
 			{text: "file1.env", filePath: "file1.env", isHeader: false},
@@ -19,17 +20,14 @@ func TestPickerModelInit(t *testing.T) {
 		rootDir:  "/test",
 	}
 
-	// Act
 	cmd := model.Init()
 
-	// Assert
 	if cmd != nil {
 		t.Errorf("PickerModel.Init() should return nil, got %v", cmd)
 	}
 }
 
 func TestPickerModelUpdateWithInitMsg(t *testing.T) {
-	// Arrange
 	model := PickerModel{}
 	initMsg := pickerInitMsg{
 		items: []pickerItem{
@@ -41,14 +39,9 @@ func TestPickerModelUpdateWithInitMsg(t *testing.T) {
 		rootDir:  "/project",
 	}
 
-	// Act
 	newModel, cmd := model.Update(initMsg)
 
-	// Assert
-	newPickerModel, ok := newModel.(PickerModel)
-	if !ok {
-		t.Fatalf("Update() did not return PickerModel")
-	}
+	newPickerModel := newModel.(PickerModel)
 
 	if len(newPickerModel.items) != 2 {
 		t.Errorf("Update() items count = %d, expected 2", len(newPickerModel.items))
@@ -132,21 +125,15 @@ func TestPickerModelUpdateNavigation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
 			model := PickerModel{
 				items:    tt.initialItems,
 				selected: make(map[int]bool),
 				cursor:   tt.initialCursor,
 			}
 
-			// Act
 			newModel, cmd := model.Update(tt.keyMsg)
 
-			// Assert
-			newPickerModel, ok := newModel.(PickerModel)
-			if !ok {
-				t.Fatalf("Update() did not return PickerModel")
-			}
+			newPickerModel := newModel.(PickerModel)
 
 			if newPickerModel.cursor != tt.expectedCursor {
 				t.Errorf("Update() cursor = %d, expected %d", newPickerModel.cursor, tt.expectedCursor)
@@ -160,7 +147,6 @@ func TestPickerModelUpdateNavigation(t *testing.T) {
 }
 
 func TestPickerModelUpdateToggleSelection(t *testing.T) {
-	// Arrange
 	model := PickerModel{
 		items: []pickerItem{
 			{text: "file1.env", filePath: "file1.env", isHeader: false},
@@ -170,17 +156,11 @@ func TestPickerModelUpdateToggleSelection(t *testing.T) {
 		cursor:   1,
 	}
 
-	// Act
 	spaceKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}}
 	newModel, cmd := model.Update(spaceKey)
 
-	// Assert
-	newPickerModel, ok := newModel.(PickerModel)
-	if !ok {
-		t.Fatalf("Update() did not return PickerModel")
-	}
+	newPickerModel := newModel.(PickerModel)
 
-	// Selection should be toggled from false to true
 	if !newPickerModel.selected[1] {
 		t.Errorf("Update() space key should toggle selection, expected index 1 to be true")
 	}
@@ -191,7 +171,6 @@ func TestPickerModelUpdateToggleSelection(t *testing.T) {
 }
 
 func TestPickerModelUpdateToggleSelectionFromTrue(t *testing.T) {
-	// Arrange
 	model := PickerModel{
 		items: []pickerItem{
 			{text: "file1.env", filePath: "file1.env", isHeader: false},
@@ -201,17 +180,11 @@ func TestPickerModelUpdateToggleSelectionFromTrue(t *testing.T) {
 		cursor:   1,
 	}
 
-	// Act
 	spaceKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}}
 	newModel, cmd := model.Update(spaceKey)
 
-	// Assert
-	newPickerModel, ok := newModel.(PickerModel)
-	if !ok {
-		t.Fatalf("Update() did not return PickerModel")
-	}
+	newPickerModel := newModel.(PickerModel)
 
-	// Selection should be toggled from true to false
 	if newPickerModel.selected[1] {
 		t.Errorf("Update() space key should toggle selection, expected index 1 to be false")
 	}
@@ -222,7 +195,6 @@ func TestPickerModelUpdateToggleSelectionFromTrue(t *testing.T) {
 }
 
 func TestPickerModelUpdateEnterWithSelection(t *testing.T) {
-	// Arrange
 	model := PickerModel{
 		items: []pickerItem{
 			{text: ".env", filePath: ".env", isHeader: false},
@@ -234,36 +206,24 @@ func TestPickerModelUpdateEnterWithSelection(t *testing.T) {
 		mode:     GenerateExample,
 	}
 
-	// Act
 	enterKey := tea.KeyMsg{Type: tea.KeyEnter}
 	_, cmd := model.Update(enterKey)
 
-	// Assert
 	if cmd == nil {
 		t.Errorf("Update() enter key should return a command")
 		return
 	}
 
-	// Execute command to get message
 	msg := cmd()
-	finishedMsg, ok := msg.(PickerFinishedMsg)
-	if !ok {
-		t.Fatalf("Command did not return PickerFinishedMsg")
-	}
+	finishedMsg := msg.(PickerFinishedMsg)
 
-	// Should have 2 selected files
 	if len(finishedMsg.Selected) != 2 {
 		t.Errorf("PickerFinishedMsg.Selected = %d files, expected 2", len(finishedMsg.Selected))
 	}
 
-	// Should contain() correct files (order may vary due to map iteration)
 	expectedFiles := map[string]bool{
 		".env":      true,
 		"prod/.env": true,
-	}
-
-	if len(finishedMsg.Selected) != 2 {
-		t.Errorf("Expected 2 selected files, got %d", len(finishedMsg.Selected))
 	}
 
 	for _, file := range finishedMsg.Selected {
@@ -311,10 +271,8 @@ func TestGroupFilesByDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Act
 			result := groupFilesByDirectory(tt.files)
 
-			// Assert
 			if len(result) != len(tt.expected) {
 				t.Errorf("groupFilesByDirectory() returned %d items, expected %d", len(result), len(tt.expected))
 				return
@@ -336,7 +294,6 @@ func TestGroupFilesByDirectory(t *testing.T) {
 }
 
 func TestPickerModelUpdateEnterWithNoSelection(t *testing.T) {
-	// Arrange
 	model := PickerModel{
 		items: []pickerItem{
 			{text: ".env", filePath: ".env", isHeader: false},
@@ -346,18 +303,15 @@ func TestPickerModelUpdateEnterWithNoSelection(t *testing.T) {
 		mode:     GenerateEnv,
 	}
 
-	// Act
 	enterKey := tea.KeyMsg{Type: tea.KeyEnter}
 	_, cmd := model.Update(enterKey)
 
-	// Assert - when no files are selected, Enter should do nothing (return nil command)
 	if cmd != nil {
 		t.Errorf("Update() enter key with no selection should return nil command, got %v", cmd)
 	}
 }
 
 func TestPickerModelUpdateEmptyFilesNavigation(t *testing.T) {
-	// Arrange
 	model := PickerModel{
 		items:    []pickerItem{},
 		selected: map[int]bool{},
@@ -375,18 +329,481 @@ func TestPickerModelUpdateEmptyFilesNavigation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Act
 			newModel, cmd := model.Update(tt.keyMsg)
 
-			// Assert
-			newPickerModel, ok := newModel.(PickerModel)
-			if !ok {
-				t.Fatalf("Update() did not return PickerModel")
-			}
+			newPickerModel := newModel.(PickerModel)
 
-			// Cursor should remain at 0
 			if newPickerModel.cursor != 0 {
 				t.Errorf("Update() cursor = %d, expected 0", newPickerModel.cursor)
+			}
+
+			if cmd != nil {
+				t.Errorf("Update() should return nil command, got %v", cmd)
+			}
+		})
+	}
+}
+
+func TestPickerModelScrolling(t *testing.T) {
+	makeItems := func(n int) []pickerItem {
+		items := make([]pickerItem, n)
+		for i := range n {
+			items[i] = pickerItem{text: fmt.Sprintf("file%d.env", i), filePath: fmt.Sprintf("file%d.env", i), isHeader: false}
+		}
+		return items
+	}
+
+	t.Run("cursor remains visible after scrolling down", func(t *testing.T) {
+		items := makeItems(20)
+		selected := make(map[int]bool)
+		for i := range items {
+			selected[i] = false
+		}
+		m := PickerModel{
+			items:        items,
+			selected:     selected,
+			cursor:       0,
+			windowHeight: 12,
+		}
+
+		for range 8 {
+			newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+			m = newModel.(PickerModel)
+		}
+
+		if m.cursor != 8 {
+			t.Errorf("cursor position = %d, expected 8", m.cursor)
+		}
+
+		visible := m.visibleLines()
+		if m.cursor < m.offset || m.cursor >= m.offset+visible {
+			t.Errorf("cursor at position %d is not visible in viewport (offset=%d, visible=%d)", m.cursor, m.offset, visible)
+		}
+	})
+
+	t.Run("cursor remains visible after scrolling up", func(t *testing.T) {
+		items := makeItems(20)
+		selected := make(map[int]bool)
+		for i := range items {
+			selected[i] = false
+		}
+		m := PickerModel{
+			items:        items,
+			selected:     selected,
+			cursor:       10,
+			offset:       8,
+			windowHeight: 12,
+		}
+
+		for range 5 {
+			newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+			m = newModel.(PickerModel)
+		}
+
+		visible := m.visibleLines()
+		if m.cursor < m.offset || m.cursor >= m.offset+visible {
+			t.Errorf("cursor at position %d is not visible in viewport (offset=%d, visible=%d)", m.cursor, m.offset, visible)
+		}
+	})
+
+	t.Run("window resize keeps cursor visible", func(t *testing.T) {
+		items := makeItems(20)
+		selected := make(map[int]bool)
+		for i := range items {
+			selected[i] = false
+		}
+		m := PickerModel{
+			items:        items,
+			selected:     selected,
+			cursor:       19,
+			offset:       18,
+			windowHeight: 12,
+		}
+
+		newModel, _ := m.Update(tea.WindowSizeMsg{Height: 30})
+		m = newModel.(PickerModel)
+
+		visible := m.visibleLines()
+		if m.cursor < m.offset || m.cursor >= m.offset+visible {
+			t.Errorf("cursor at position %d is not visible after window resize (offset=%d, visible=%d)", m.cursor, m.offset, visible)
+		}
+	})
+
+	t.Run("no scrolling when all items fit on screen", func(t *testing.T) {
+		items := makeItems(3)
+		selected := make(map[int]bool)
+		for i := range items {
+			selected[i] = false
+		}
+		m := PickerModel{
+			items:        items,
+			selected:     selected,
+			cursor:       0,
+			windowHeight: 30,
+		}
+
+		view := m.View()
+
+		if strings.Contains(view, "more items") {
+			t.Error("view should not show scroll indicators when all items fit on screen")
+		}
+	})
+
+	t.Run("scroll indicators shown when items overflow viewport", func(t *testing.T) {
+		items := makeItems(20)
+		selected := make(map[int]bool)
+		for i := range items {
+			selected[i] = false
+		}
+		m := PickerModel{
+			items:        items,
+			selected:     selected,
+			cursor:       10,
+			offset:       5,
+			windowHeight: 12,
+		}
+
+		view := m.View()
+
+		if !strings.Contains(view, "more items above") {
+			t.Error("view should show 'more items above' indicator when scrolled down")
+		}
+		if !strings.Contains(view, "more items below") {
+			t.Error("view should show 'more items below' indicator when more items exist below viewport")
+		}
+	})
+
+	t.Run("only top scroll indicator when at bottom", func(t *testing.T) {
+		items := makeItems(20)
+		selected := make(map[int]bool)
+		for i := range items {
+			selected[i] = false
+		}
+		m := PickerModel{
+			items:        items,
+			selected:     selected,
+			cursor:       19,
+			offset:       14,
+			windowHeight: 12,
+		}
+
+		view := m.View()
+
+		if !strings.Contains(view, "more items above") {
+			t.Error("view should show 'more items above' when scrolled to bottom")
+		}
+		if strings.Contains(view, "more items below") {
+			t.Error("view should not show 'more items below' when at the bottom")
+		}
+	})
+
+	t.Run("only bottom scroll indicator when at top", func(t *testing.T) {
+		items := makeItems(20)
+		selected := make(map[int]bool)
+		for i := range items {
+			selected[i] = false
+		}
+		m := PickerModel{
+			items:        items,
+			selected:     selected,
+			cursor:       5,
+			offset:       0,
+			windowHeight: 12,
+		}
+
+		view := m.View()
+
+		if strings.Contains(view, "more items above") {
+			t.Error("view should not show 'more items above' when at the top")
+		}
+		if !strings.Contains(view, "more items below") {
+			t.Error("view should show 'more items below' when more items exist below")
+		}
+	})
+}
+
+func TestPickerModelSetWindowHeight(t *testing.T) {
+	t.Run("window height is set correctly", func(t *testing.T) {
+		m := &PickerModel{}
+
+		m.SetWindowHeight(42)
+
+		if m.windowHeight != 42 {
+			t.Errorf("windowHeight = %d, expected 42", m.windowHeight)
+		}
+	})
+}
+
+func TestPickerModelVisibleLines(t *testing.T) {
+	tests := []struct {
+		name         string
+		windowHeight int
+		itemCount    int
+		wantMin      int
+		wantMax      int
+	}{
+		{
+			name:         "small window shows all items when overhead is larger",
+			windowHeight: 5,
+			itemCount:    10,
+			wantMin:      10,
+			wantMax:      10,
+		},
+		{
+			name:         "large window shows all items when they fit",
+			windowHeight: 50,
+			itemCount:    10,
+			wantMin:      10,
+			wantMax:      10,
+		},
+		{
+			name:         "medium window shows subset when items overflow",
+			windowHeight: 20,
+			itemCount:    30,
+			wantMin:      14,
+			wantMax:      14,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			items := make([]pickerItem, tt.itemCount)
+			for i := range items {
+				items[i] = pickerItem{text: fmt.Sprintf("item%d", i), filePath: fmt.Sprintf("item%d", i), isHeader: false}
+			}
+			m := PickerModel{
+				items:        items,
+				windowHeight: tt.windowHeight,
+			}
+
+			visible := m.visibleLines()
+
+			if visible < tt.wantMin || visible > tt.wantMax {
+				t.Errorf("visibleLines() = %d, expected range [%d, %d]", visible, tt.wantMin, tt.wantMax)
+			}
+		})
+	}
+}
+
+func TestPickerModelUpdateSelectAllToggle(t *testing.T) {
+	tests := []struct {
+		name                string
+		initialSelection    map[int]bool
+		expectedAfterToggle map[int]bool
+		items               []pickerItem
+	}{
+		{
+			name: "select all when none are selected",
+			initialSelection: map[int]bool{
+				1: false,
+				2: false,
+				4: false,
+				5: false,
+			},
+			expectedAfterToggle: map[int]bool{
+				1: true,
+				2: true,
+				4: true,
+				5: true,
+			},
+			items: []pickerItem{
+				{text: "Group 1", filePath: "", isHeader: true},
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+				{text: "file2.env", filePath: "file2.env", isHeader: false},
+				{text: "Group 2", filePath: "", isHeader: true},
+				{text: "file3.env", filePath: "file3.env", isHeader: false},
+				{text: "file4.env", filePath: "file4.env", isHeader: false},
+			},
+		},
+		{
+			name: "deselect all when all are selected",
+			initialSelection: map[int]bool{
+				1: true,
+				2: true,
+			},
+			expectedAfterToggle: map[int]bool{
+				1: false,
+				2: false,
+			},
+			items: []pickerItem{
+				{text: "Group 1", filePath: "", isHeader: true},
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+				{text: "file2.env", filePath: "file2.env", isHeader: false},
+			},
+		},
+		{
+			name: "select all when some are selected",
+			initialSelection: map[int]bool{
+				1: true,
+				2: false,
+				3: true,
+			},
+			expectedAfterToggle: map[int]bool{
+				1: true,
+				2: true,
+				3: true,
+			},
+			items: []pickerItem{
+				{text: "Group 1", filePath: "", isHeader: true},
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+				{text: "file2.env", filePath: "file2.env", isHeader: false},
+				{text: "file3.env", filePath: "file3.env", isHeader: false},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := PickerModel{
+				items:    tt.items,
+				selected: tt.initialSelection,
+				cursor:   1,
+			}
+
+			aKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+			newModel, cmd := model.Update(aKey)
+
+			newPickerModel := newModel.(PickerModel)
+
+			for i := range tt.items {
+				if !tt.items[i].isHeader {
+					if newPickerModel.selected[i] != tt.expectedAfterToggle[i] {
+						t.Errorf("Update() 'a' key: item %d selection = %v, expected %v",
+							i, newPickerModel.selected[i], tt.expectedAfterToggle[i])
+					}
+				}
+			}
+
+			if cmd != nil {
+				t.Errorf("Update() should return nil command, got %v", cmd)
+			}
+		})
+	}
+}
+
+func TestPickerModelNavigationWithHeaders(t *testing.T) {
+	tests := []struct {
+		name           string
+		initialCursor  int
+		initialItems   []pickerItem
+		keyMsg         tea.KeyMsg
+		expectedCursor int
+	}{
+		{
+			name:          "cursor skips headers when moving down",
+			initialCursor: 0,
+			initialItems: []pickerItem{
+				{text: "Group 1", filePath: "", isHeader: true},
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+				{text: "file2.env", filePath: "file2.env", isHeader: false},
+			},
+			keyMsg:         tea.KeyMsg{Type: tea.KeyDown},
+			expectedCursor: 1,
+		},
+		{
+			name:          "cursor skips headers when moving up",
+			initialCursor: 3,
+			initialItems: []pickerItem{
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+				{text: "Group 1", filePath: "", isHeader: true},
+				{text: "file2.env", filePath: "file2.env", isHeader: false},
+				{text: "file3.env", filePath: "file3.env", isHeader: false},
+			},
+			keyMsg:         tea.KeyMsg{Type: tea.KeyUp},
+			expectedCursor: 2,
+		},
+		{
+			name:          "cursor stays at last selectable when header follows",
+			initialCursor: 2,
+			initialItems: []pickerItem{
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+				{text: "file2.env", filePath: "file2.env", isHeader: false},
+				{text: "Group 1", filePath: "", isHeader: true},
+			},
+			keyMsg:         tea.KeyMsg{Type: tea.KeyDown},
+			expectedCursor: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := PickerModel{
+				items:    tt.initialItems,
+				selected: make(map[int]bool),
+				cursor:   tt.initialCursor,
+			}
+
+			newModel, cmd := model.Update(tt.keyMsg)
+
+			newPickerModel := newModel.(PickerModel)
+
+			if newPickerModel.cursor != tt.expectedCursor {
+				t.Errorf("Update() cursor = %d, expected %d", newPickerModel.cursor, tt.expectedCursor)
+			}
+
+			if cmd != nil {
+				t.Errorf("Update() should return nil command, got %v", cmd)
+			}
+		})
+	}
+}
+
+func TestPickerModelInitMsgPositionsCursorAtFirstSelectable(t *testing.T) {
+	tests := []struct {
+		name           string
+		items          []pickerItem
+		expectedCursor int
+	}{
+		{
+			name: "first item is selectable",
+			items: []pickerItem{
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+				{text: "file2.env", filePath: "file2.env", isHeader: false},
+			},
+			expectedCursor: 0,
+		},
+		{
+			name: "skips header to find first selectable",
+			items: []pickerItem{
+				{text: "Group 1", filePath: "", isHeader: true},
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+			},
+			expectedCursor: 1,
+		},
+		{
+			name: "multiple headers before first selectable",
+			items: []pickerItem{
+				{text: "Header 1", filePath: "", isHeader: true},
+				{text: "Header 2", filePath: "", isHeader: true},
+				{text: "file1.env", filePath: "file1.env", isHeader: false},
+			},
+			expectedCursor: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := PickerModel{}
+			selected := make(map[int]bool)
+			for i := range tt.items {
+				if !tt.items[i].isHeader {
+					selected[i] = false
+				}
+			}
+			initMsg := pickerInitMsg{
+				items:    tt.items,
+				selected: selected,
+				mode:     GenerateEnv,
+				rootDir:  "/test",
+			}
+
+			newModel, cmd := model.Update(initMsg)
+
+			newPickerModel := newModel.(PickerModel)
+
+			if newPickerModel.cursor != tt.expectedCursor {
+				t.Errorf("Update() with initMsg positioned cursor at %d, expected %d",
+					newPickerModel.cursor, tt.expectedCursor)
 			}
 
 			if cmd != nil {
@@ -407,7 +824,6 @@ func TestPickerModelUpdateQuit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
 			model := PickerModel{
 				items: []pickerItem{
 					{text: ".env", filePath: ".env", isHeader: false},
@@ -416,16 +832,10 @@ func TestPickerModelUpdateQuit(t *testing.T) {
 				cursor:   0,
 			}
 
-			// Act
 			newModel, cmd := model.Update(tt.keyMsg)
 
-			// Assert
-			_, ok := newModel.(PickerModel)
-			if !ok {
-				t.Fatalf("Update() did not return PickerModel")
-			}
+			_ = newModel.(PickerModel)
 
-			// q and esc should return nil (handled by main)
 			if cmd != nil {
 				t.Errorf("Update(%q) should return nil command, got %v", tt.name, cmd)
 			}
