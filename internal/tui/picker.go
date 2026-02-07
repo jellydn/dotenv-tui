@@ -33,9 +33,7 @@ type PickerFinishedMsg struct {
 	Mode     MenuChoice
 }
 
-// groupFilesByDirectory groups files by directory and creates picker items with headers.
 func groupFilesByDirectory(files []string) []pickerItem {
-	// Group files by directory
 	dirGroups := make(map[string][]string)
 	for _, file := range files {
 		dir := filepath.Dir(file)
@@ -45,24 +43,20 @@ func groupFilesByDirectory(files []string) []pickerItem {
 		dirGroups[dir] = append(dirGroups[dir], file)
 	}
 
-	// Sort directories alphabetically
 	var dirs []string
 	for dir := range dirGroups {
 		dirs = append(dirs, dir)
 	}
 	sort.Strings(dirs)
 
-	// Create items with headers and sorted files
 	var items []pickerItem
 	for _, dir := range dirs {
-		// Add header
 		items = append(items, pickerItem{
 			text:     dir,
 			filePath: "",
 			isHeader: true,
 		})
 
-		// Sort files within the directory alphabetically
 		sort.Strings(dirGroups[dir])
 		for _, file := range dirGroups[dir] {
 			items = append(items, pickerItem{
@@ -81,13 +75,9 @@ func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
 	var files []string
 	var err error
 
-	// Choose scanner based on mode
-	switch mode {
-	case GenerateExample:
-		files, err = scanner.Scan(rootDir)
-	case GenerateEnv:
+	if mode == GenerateEnv {
 		files, err = scanner.ScanExamples(rootDir)
-	default:
+	} else {
 		files, err = scanner.Scan(rootDir)
 	}
 
@@ -95,10 +85,8 @@ func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
 		files = []string{}
 	}
 
-	// Group files by directory with headers
 	items := groupFilesByDirectory(files)
 
-	// Initialize with no files selected by default (only for non-header items)
 	selected := make(map[int]bool)
 	for i, item := range items {
 		if !item.isHeader {
@@ -128,14 +116,13 @@ func (m PickerModel) Init() tea.Cmd {
 	return nil
 }
 
-// findNextSelectableItem finds the next selectable (non-header) item.
 func (m PickerModel) findNextSelectableItem(from int, direction int) int {
 	for i := from; i >= 0 && i < len(m.items); i += direction {
 		if !m.items[i].isHeader {
 			return i
 		}
 	}
-	return from // return original if no selectable item found
+	return from
 }
 
 // Update handles messages and updates the picker model.
@@ -146,7 +133,6 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selected = msg.selected
 		m.mode = msg.mode
 		m.rootDir = msg.rootDir
-		// Set cursor to first selectable item
 		if len(m.items) > 0 {
 			m.cursor = m.findNextSelectableItem(0, 1)
 		}
@@ -190,7 +176,6 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					selectedFiles = append(selectedFiles, m.items[i].filePath)
 				}
 			}
-			// Only proceed if at least one file is selected
 			if len(selectedFiles) > 0 {
 				return m, func() tea.Msg {
 					return PickerFinishedMsg{
@@ -199,7 +184,6 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-			// If no files selected, do nothing
 		case "q", "esc":
 			return m, nil
 		case "ctrl+c":
@@ -211,14 +195,9 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the file picker UI.
 func (m PickerModel) View() string {
-	var titleText string
-	switch m.mode {
-	case GenerateExample:
-		titleText = "Select .env files"
-	case GenerateEnv:
+	titleText := "Select .env files"
+	if m.mode == GenerateEnv {
 		titleText = "Select .env.example files"
-	default:
-		titleText = "Select .env files"
 	}
 
 	title := lipgloss.NewStyle().
@@ -228,7 +207,6 @@ func (m PickerModel) View() string {
 		Padding(0, 1).
 		Render(titleText)
 
-	// Count actual files (non-header items)
 	fileCount := 0
 	for _, item := range m.items {
 		if !item.isHeader {
@@ -237,14 +215,9 @@ func (m PickerModel) View() string {
 	}
 
 	if fileCount == 0 {
-		var noFilesText string
-		switch m.mode {
-		case GenerateExample:
-			noFilesText = "No .env files found in current directory"
-		case GenerateEnv:
+		noFilesText := "No .env files found in current directory"
+		if m.mode == GenerateEnv {
 			noFilesText = "No .env.example files found in current directory"
-		default:
-			noFilesText = "No .env files found in current directory"
 		}
 		noFiles := lipgloss.NewStyle().
 			Faint(true).
@@ -255,14 +228,9 @@ func (m PickerModel) View() string {
 	var list string
 
 	if fileCount == 1 {
-		var fileType string
-		switch m.mode {
-		case GenerateExample:
-			fileType = ".env"
-		case GenerateEnv:
+		fileType := ".env"
+		if m.mode == GenerateEnv {
 			fileType = ".env.example"
-		default:
-			fileType = ".env"
 		}
 		singleFileIndicator := lipgloss.NewStyle().
 			Faint(true).
@@ -272,7 +240,6 @@ func (m PickerModel) View() string {
 
 	for i, item := range m.items {
 		if item.isHeader {
-			// Render header with different style
 			headerStyle := lipgloss.NewStyle().
 				Bold(true).
 				Faint(true).

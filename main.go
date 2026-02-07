@@ -18,16 +18,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Version is set at build time via ldflags, or read from module info when using go install
 var Version = ""
 
-// getVersion returns the version string, checking build info first, then falling back to ldflags
 func getVersion() string {
 	if Version != "" {
 		return Version
 	}
 
-	// Try to get version from build info (works with go install)
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if info.Main.Version != "" && info.Main.Version != "(devel)" {
 			return info.Main.Version
@@ -179,28 +176,27 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m *model) navigateToFile() (tea.Model, tea.Cmd) {
+	if m.pickerMode == tui.GenerateExample {
+		m.currentScreen = previewScreen
+		return *m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+	}
+	m.currentScreen = formScreen
+	return *m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+}
+
 func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "tab":
-			m.fileIndex = (m.fileIndex + 1) % len(m.fileList)
-			if m.pickerMode == tui.GenerateExample {
-				m.currentScreen = previewScreen
-				return m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
-			}
-			if m.pickerMode == tui.GenerateEnv {
-				m.currentScreen = formScreen
-				return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+			if len(m.fileList) > 1 {
+				m.fileIndex = (m.fileIndex + 1) % len(m.fileList)
+				return m.navigateToFile()
 			}
 		case "shift+tab":
-			m.fileIndex = (m.fileIndex - 1 + len(m.fileList)) % len(m.fileList)
-			if m.pickerMode == tui.GenerateExample {
-				m.currentScreen = previewScreen
-				return m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
-			}
-			if m.pickerMode == tui.GenerateEnv {
-				m.currentScreen = formScreen
-				return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+			if len(m.fileList) > 1 {
+				m.fileIndex = (m.fileIndex - 1 + len(m.fileList)) % len(m.fileList)
+				return m.navigateToFile()
 			}
 		case "q", "esc":
 			m.currentScreen = menuScreen
@@ -225,7 +221,10 @@ func (m model) viewDone() string {
 	}
 
 	status := fmt.Sprintf("Processed: %s [%d/%d]", currentFile, m.fileIndex+1, len(m.fileList))
-	help := "Tab: next file • Shift+Tab: previous file • q: back to menu"
+	help := "q: back to menu"
+	if len(m.fileList) > 1 {
+		help = "Tab: next file • Shift+Tab: previous file • q: back to menu"
+	}
 
 	return fmt.Sprintf(
 		"\n%s\n\n%s\n\n%s\n",
