@@ -1,3 +1,4 @@
+// Package tui provides Bubble Tea components for the terminal UI.
 package tui
 
 import (
@@ -13,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// FormField represents a single field in the form for user input.
 type FormField struct {
 	Key           string
 	Value         string
@@ -21,6 +23,7 @@ type FormField struct {
 	IsPlaceholder bool
 }
 
+// FormModel is the Bubble Tea model for the interactive form component.
 type FormModel struct {
 	fields          []FormField
 	originalEntries []parser.Entry
@@ -32,6 +35,7 @@ type FormModel struct {
 	successMsg      string
 }
 
+// FormFinishedMsg signals the form has completed with success status.
 type FormFinishedMsg struct {
 	Success bool
 	Error   string
@@ -43,6 +47,7 @@ type formInitMsg struct {
 	filePath        string
 }
 
+// NewFormModel creates a new form model for collecting environment variables.
 func NewFormModel(exampleFilePath string) tea.Cmd {
 	return func() tea.Msg {
 		// Read the .env.example file
@@ -128,7 +133,7 @@ func isPlaceholderValue(value string) bool {
 	return false
 }
 
-func generateHint(key, value string) string {
+func generateHint(key, _ string) string {
 	lowerKey := strings.ToLower(key)
 
 	// Map patterns to hints
@@ -157,6 +162,7 @@ func generateHint(key, value string) string {
 	return "Enter value for " + key
 }
 
+// Init initializes the form model.
 func (m FormModel) Init() tea.Cmd {
 	return nil
 }
@@ -177,6 +183,7 @@ func (m *FormModel) moveCursor(newCursor int) {
 	}
 }
 
+// Update handles messages and updates the form model.
 func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case formInitMsg:
@@ -303,6 +310,7 @@ func (m FormModel) saveForm() tea.Cmd {
 	}
 }
 
+// View renders the form UI.
 func (m FormModel) View() string {
 	if m.confirmed {
 		if m.errorMsg != "" {

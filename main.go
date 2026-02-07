@@ -1,3 +1,4 @@
+// dotenv-tui is a terminal UI tool for managing .env files.
 package main
 
 import (
@@ -82,9 +83,8 @@ func updateMenu(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	m.menu = menuModel.(tui.MenuModel)
 	cmd = menuCmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == "enter" || msg.String() == " " {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if keyMsg.String() == "enter" || keyMsg.String() == " " {
 			// Transition to picker
 			m.currentScreen = pickerScreen
 			return m, tui.NewPickerModel(m.menu.Choice(), ".")

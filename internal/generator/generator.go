@@ -1,3 +1,4 @@
+// Package generator creates .env.example files by masking secrets.
 package generator
 
 import (

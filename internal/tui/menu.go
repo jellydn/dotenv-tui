@@ -1,3 +1,4 @@
+// Package tui provides Bubble Tea components for the terminal UI.
 package tui
 
 import (
@@ -5,36 +6,43 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// MenuChoice represents the user's selection in the main menu.
 type MenuChoice int
 
 const (
+	// GenerateExample creates .env.example from .env files.
 	GenerateExample MenuChoice = iota
+	// GenerateEnv creates .env files from .env.example.
 	GenerateEnv
 )
 
+// MenuModel is the Bubble Tea model for the main menu.
 type MenuModel struct {
 	choice MenuChoice
 }
 
+// NewMenuModel creates a new menu model with default selection.
 func NewMenuModel() MenuModel {
 	return MenuModel{
 		choice: GenerateExample,
 	}
 }
 
-// Choice returns the current menu choice
+// Choice returns the current menu choice.
 func (m MenuModel) Choice() MenuChoice {
 	return m.choice
 }
 
+// Init initializes the menu model.
 func (m MenuModel) Init() tea.Cmd {
 	return nil
 }
 
+// Update handles messages and updates the menu model.
 func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch keyMsg.String() {
 		case "up", "k":
 			if m.choice > GenerateExample {
 				m.choice--
@@ -53,6 +61,7 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View renders the menu UI.
 func (m MenuModel) View() string {
 	logo := Logo()
 	wordmark := Wordmark()

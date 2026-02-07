@@ -37,7 +37,11 @@ func TestParseRealEnvFiles(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to open %s: %v", path, err)
 			}
-			defer file.Close()
+			defer func() {
+				if err := file.Close(); err != nil {
+					t.Logf("failed to close %s: %v", path, err)
+				}
+			}()
 
 			entries, err := parser.Parse(file)
 			if err != nil {

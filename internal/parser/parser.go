@@ -1,3 +1,4 @@
+// Package parser provides functions to parse and write .env files.
 package parser
 
 import (

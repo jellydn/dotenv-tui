@@ -1,3 +1,4 @@
+// Package tui provides Bubble Tea components for the terminal UI.
 package tui
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// PickerModel is the Bubble Tea model for selecting .env files.
 type PickerModel struct {
 	files    []string
 	selected map[int]bool
@@ -15,11 +17,13 @@ type PickerModel struct {
 	rootDir  string
 }
 
+// PickerFinishedMsg signals file selection is complete.
 type PickerFinishedMsg struct {
 	Selected []string
 	Mode     MenuChoice
 }
 
+// NewPickerModel creates a file picker for selecting .env files.
 func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
 	files, err := scanner.Scan(rootDir)
 	if err != nil {
@@ -49,10 +53,12 @@ type pickerInitMsg struct {
 	rootDir  string
 }
 
+// Init initializes the picker model.
 func (m PickerModel) Init() tea.Cmd {
 	return nil
 }
 
+// Update handles messages and updates the picker model.
 func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case pickerInitMsg:
@@ -114,6 +120,7 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View renders the file picker UI.
 func (m PickerModel) View() string {
 	title := lipgloss.NewStyle().
 		Bold(true).

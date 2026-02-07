@@ -1,7 +1,9 @@
+// Package tui provides Bubble Tea components for the terminal UI.
 package tui
 
 import "github.com/charmbracelet/lipgloss"
 
+// Logo returns the ASCII art logo for the application.
 func Logo() string {
 	teal := lipgloss.Color("#0F766E")
 	green := lipgloss.Color("#34D399")
@@ -41,6 +43,7 @@ func Logo() string {
 	return logo
 }
 
+// Wordmark returns the styled application name and tagline.
 func Wordmark() string {
 	title := lipgloss.NewStyle().
 		Bold(true).

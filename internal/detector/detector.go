@@ -1,3 +1,4 @@
+// Package detector provides functions to identify secrets in environment variables.
 package detector
 
 import (
@@ -31,8 +32,9 @@ func IsSecret(key string, value string) bool {
 	return false
 }
 
-// GeneratePlaceholder creates a format-hint placeholder for a secret
-func GeneratePlaceholder(key string, value string) string {
+// GeneratePlaceholder creates a format-hint placeholder for a secret.
+// The key parameter is kept for API consistency but not currently used.
+func GeneratePlaceholder(_ string, value string) string {
 	// JWT token pattern
 	if strings.HasPrefix(value, "eyJ") && len(value) > 50 {
 		return "eyJ***"

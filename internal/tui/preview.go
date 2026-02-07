@@ -1,3 +1,4 @@
+// Package tui provides Bubble Tea components for the terminal UI.
 package tui
 
 import (
@@ -13,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// PreviewModel is the Bubble Tea model for previewing .env.example diffs.
 type PreviewModel struct {
 	originalEntries  []parser.Entry
 	generatedEntries []parser.Entry
@@ -24,10 +26,12 @@ type PreviewModel struct {
 	success          bool
 }
 
+// PreviewFinishedMsg signals the preview has completed with success status.
 type PreviewFinishedMsg struct {
 	Success bool
 }
 
+// NewPreviewModel creates a preview for the generated .env.example output.
 func NewPreviewModel(filePath string, _ []parser.Entry) tea.Cmd {
 	return func() tea.Msg {
 		// Read the original file
@@ -115,6 +119,7 @@ func entryToString(entry parser.Entry) string {
 	}
 }
 
+// Init initializes the preview model.
 func (m PreviewModel) Init() tea.Cmd {
 	return nil
 }
@@ -129,6 +134,7 @@ func (m *PreviewModel) adjustScroll() {
 	}
 }
 
+// Update handles messages and updates the preview model.
 func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case previewInitMsg:
@@ -139,14 +145,15 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.confirmed && m.success {
+		switch {
+		case m.confirmed && m.success:
 			switch msg.String() {
 			case "enter", "q", "esc":
 				return m, func() tea.Msg {
 					return PreviewFinishedMsg{Success: true}
 				}
 			}
-		} else if m.confirmed {
+		case m.confirmed:
 			switch msg.String() {
 			case "y", "Y", "enter":
 				if err := m.writeFile(); err != nil {
@@ -160,7 +167,7 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return PreviewFinishedMsg{Success: false}
 				}
 			}
-		} else {
+		default:
 			switch msg.String() {
 			case "up", "k":
 				if m.cursor > 0 {
@@ -196,6 +203,7 @@ func (m PreviewModel) writeFile() error {
 	return parser.Write(file, m.generatedEntries)
 }
 
+// View renders the diff preview UI.
 func (m PreviewModel) View() string {
 	title := lipgloss.NewStyle().
 		Bold(true).

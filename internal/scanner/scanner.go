@@ -1,3 +1,4 @@
+// Package scanner recursively finds .env files in project directories.
 package scanner
 
 import (
