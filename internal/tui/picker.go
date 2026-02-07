@@ -76,6 +76,20 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.files) > 0 {
 				m.selected[m.cursor] = !m.selected[m.cursor]
 			}
+		case "a":
+			// Toggle select all
+			if len(m.files) > 0 {
+				allSelected := true
+				for i := range m.files {
+					if !m.selected[i] {
+						allSelected = false
+						break
+					}
+				}
+				for i := range m.files {
+					m.selected[i] = !allSelected
+				}
+			}
 		case "enter":
 			// Collect selected files (iterate in order to ensure deterministic output)
 			var selectedFiles []string
@@ -93,6 +107,8 @@ func (m PickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "esc":
 			// Let main handle the screen transition
 			return m, nil
+		case "ctrl+c":
+			return m, tea.Quit
 		}
 	}
 	return m, nil
@@ -114,6 +130,15 @@ func (m PickerModel) View() string {
 	}
 
 	var list string
+
+	// Show indicator if only one file found
+	if len(m.files) == 1 {
+		singleFileIndicator := lipgloss.NewStyle().
+			Faint(true).
+			Render("(only 1 file found)")
+		list += singleFileIndicator + "\n\n"
+	}
+
 	for i, file := range m.files {
 		cursor := " "
 		if i == m.cursor {
@@ -135,7 +160,7 @@ func (m PickerModel) View() string {
 
 	help := lipgloss.NewStyle().
 		Faint(true).
-		Render("↑/k: up • ↓/j: down • Space: toggle • Enter: confirm • q: back")
+		Render("↑/k: up • ↓/j: down • Space: toggle • a: all • Enter: confirm • q: back")
 
 	return "\n" + title + "\n\n" + list + "\n" + help + "\n"
 }
