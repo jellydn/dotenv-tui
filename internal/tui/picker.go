@@ -2,6 +2,8 @@
 package tui
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -87,6 +89,7 @@ func NewPickerModel(mode MenuChoice, rootDir string) tea.Cmd {
 
 	if err != nil {
 		files = []string{}
+		fmt.Fprintf(os.Stderr, "Warning: failed to scan directory: %v\n", err)
 	}
 
 	items := groupFilesByDirectory(files)

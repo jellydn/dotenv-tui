@@ -385,7 +385,7 @@ func generateFile(inputPath string, force bool, outputFilename string, processEn
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
 	}
 
-	outFile, err := os.Create(outputPath)
+	outFile, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}

@@ -98,19 +98,45 @@ func TestGetLatestVersion(t *testing.T) {
 			_, _ = w.Write([]byte(`{"tag_name": "v1.2.3"}`))
 		}))
 		defer server.Close()
-		_ = server.URL
+
+		original := githubAPIURL
+		githubAPIURL = server.URL
+		defer func() { githubAPIURL = original }()
+
+		version, err := getLatestVersion()
+		if err != nil {
+			t.Fatalf("getLatestVersion() unexpected error: %v", err)
+		}
+		if version != "v1.2.3" {
+			t.Errorf("getLatestVersion() = %q, want %q", version, "v1.2.3")
+		}
 	})
 
 	t.Run("network error", func(t *testing.T) {
+		original := githubAPIURL
+		githubAPIURL = "http://localhost:1" // connection refused
+		defer func() { githubAPIURL = original }()
+
+		_, err := getLatestVersion()
+		if err == nil {
+			t.Error("getLatestVersion() expected error for network failure, got nil")
+		}
 	})
 
 	t.Run("non-200 status code", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte(`{"tag_name": ""}`))
 		}))
 		defer server.Close()
-		_ = server.URL
+
+		original := githubAPIURL
+		githubAPIURL = server.URL
+		defer func() { githubAPIURL = original }()
+
+		_, err := getLatestVersion()
+		if err == nil {
+			t.Error("getLatestVersion() expected error for non-200 status, got nil")
+		}
 	})
 
 	t.Run("empty tag name", func(t *testing.T) {
@@ -120,7 +146,15 @@ func TestGetLatestVersion(t *testing.T) {
 			_, _ = w.Write([]byte(`{"tag_name": ""}`))
 		}))
 		defer server.Close()
-		_ = server.URL
+
+		original := githubAPIURL
+		githubAPIURL = server.URL
+		defer func() { githubAPIURL = original }()
+
+		_, err := getLatestVersion()
+		if err == nil {
+			t.Error("getLatestVersion() expected error for empty tag name, got nil")
+		}
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
@@ -130,7 +164,15 @@ func TestGetLatestVersion(t *testing.T) {
 			_, _ = w.Write([]byte(`invalid json`))
 		}))
 		defer server.Close()
-		_ = server.URL
+
+		original := githubAPIURL
+		githubAPIURL = server.URL
+		defer func() { githubAPIURL = original }()
+
+		_, err := getLatestVersion()
+		if err == nil {
+			t.Error("getLatestVersion() expected error for invalid JSON, got nil")
+		}
 	})
 }
 

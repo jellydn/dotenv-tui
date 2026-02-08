@@ -134,3 +134,27 @@ func Write(writer io.Writer, entries []Entry) error {
 	}
 	return nil
 }
+
+// EntryToString converts an Entry to its string representation.
+func EntryToString(entry Entry) string {
+	switch e := entry.(type) {
+	case KeyValue:
+		line := ""
+		if e.Exported {
+			line += "export "
+		}
+		line += e.Key + "="
+		if e.Quoted != "" {
+			line += e.Quoted + e.Value + e.Quoted
+		} else {
+			line += e.Value
+		}
+		return line
+	case Comment:
+		return e.Text
+	case BlankLine:
+		return ""
+	default:
+		return ""
+	}
+}

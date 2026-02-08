@@ -11,14 +11,20 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 )
+
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 const (
 	repoOwner       = "jellydn"
 	repoName        = "dotenv-tui"
-	githubAPIURL    = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
 	downloadBaseURL = "https://github.com/" + repoOwner + "/" + repoName + "/releases/download"
 )
+
+var githubAPIURL = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
 
 // Release represents a GitHub release.
 type Release struct {
@@ -129,7 +135,7 @@ func detectPlatform() (string, string) {
 
 // getLatestVersion fetches the latest release version from GitHub.
 func getLatestVersion() (string, error) {
-	resp, err := http.Get(githubAPIURL)
+	resp, err := httpClient.Get(githubAPIURL)
 	if err != nil {
 		return "", err
 	}
@@ -173,7 +179,7 @@ func downloadBinaryAndChecksum(binaryURL, checksumURL string) (string, string, e
 
 // downloadFile downloads a file from the given URL and saves it to a temp file.
 func downloadFile(url, pattern string) (string, error) {
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		return "", err
 	}
@@ -248,12 +254,20 @@ func calculateFileSHA256(path string) (string, error) {
 }
 
 func replaceBinary(src, dst string) error {
-	if err := os.Rename(src, dst); err != nil {
-		if err := copyFile(src, dst); err != nil {
-			return err
-		}
-		return os.Remove(src)
+	tmpDst := dst + ".tmp"
+	if err := copyFile(src, tmpDst); err != nil {
+		_ = os.Remove(tmpDst)
+		return err
 	}
+	if err := os.Chmod(tmpDst, 0755); err != nil {
+		_ = os.Remove(tmpDst)
+		return err
+	}
+	if err := os.Rename(tmpDst, dst); err != nil {
+		_ = os.Remove(tmpDst)
+		return err
+	}
+	_ = os.Remove(src)
 	return nil
 }
 
@@ -265,7 +279,7 @@ func copyFile(src, dst string) error {
 	}
 	defer func() { _ = srcFile.Close() }()
 
-	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_TRUNC, 0755)
+	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}

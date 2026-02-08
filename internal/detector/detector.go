@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var hexPattern = regexp.MustCompile("^[0-9a-fA-F]+$")
+
 var (
 	secretPatternsMap = map[string]bool{
 		"SECRET": true, "TOKEN": true, "PASSWORD": true, "PASS": true,
@@ -161,7 +163,5 @@ func isBase64(s string) bool {
 }
 
 func isHex(s string) bool {
-	// Check if string contains only hex characters
-	matched, _ := regexp.MatchString("^[0-9a-fA-F]+$", s)
-	return matched
+	return hexPattern.MatchString(s)
 }

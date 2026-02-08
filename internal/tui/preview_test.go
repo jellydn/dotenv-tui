@@ -57,11 +57,11 @@ func TestEntryToString(t *testing.T) {
 			// Arrange: Entry provided in test case
 
 			// Act
-			result := entryToString(tt.entry)
+			result := parser.EntryToString(tt.entry)
 
 			// Assert
 			if result != tt.expected {
-				t.Errorf("entryToString() = %q, expected %q", result, tt.expected)
+				t.Errorf("parser.EntryToString() = %q, expected %q", result, tt.expected)
 			}
 		})
 	}
@@ -467,11 +467,11 @@ func TestEntryToStringComplex(t *testing.T) {
 			entry := tt.entry
 
 			// Act
-			result := entryToString(entry)
+			result := parser.EntryToString(entry)
 
 			// Assert
 			if !strings.Contains(result, tt.contains) {
-				t.Errorf("entryToString() result %q does not contain %q", result, tt.contains)
+				t.Errorf("parser.EntryToString() result %q does not contain %q", result, tt.contains)
 			}
 		})
 	}
