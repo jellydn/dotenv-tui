@@ -2,20 +2,15 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime/debug"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/jellydn/dotenv-tui/internal/generator"
-	"github.com/jellydn/dotenv-tui/internal/parser"
-	"github.com/jellydn/dotenv-tui/internal/scanner"
+	"github.com/jellydn/dotenv-tui/internal/cli"
 	"github.com/jellydn/dotenv-tui/internal/tui"
 	"github.com/jellydn/dotenv-tui/internal/upgrade"
 )
@@ -284,7 +279,7 @@ func main() {
 	}
 
 	if *generateExample != "" {
-		if err := generateExampleFile(*generateExample, *forceFlag); err != nil {
+		if err := cli.GenerateExampleFile(*generateExample, *forceFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating .env.example: %v\n", err)
 			os.Exit(1)
 		}
@@ -292,7 +287,7 @@ func main() {
 	}
 
 	if *generateEnv != "" {
-		if err := generateEnvFile(*generateEnv, *forceFlag); err != nil {
+		if err := cli.GenerateEnvFile(*generateEnv, *forceFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating .env: %v\n", err)
 			os.Exit(1)
 		}
@@ -305,7 +300,7 @@ func main() {
 		if len(args) > 0 {
 			scanPath = args[0]
 		}
-		if err := scanAndList(scanPath); err != nil {
+		if err := cli.ScanAndList(scanPath, cli.RealDirScanner{}, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error scanning directory: %v\n", err)
 			os.Exit(1)
 		}
@@ -313,7 +308,7 @@ func main() {
 	}
 
 	if *yoloFlag {
-		if err := generateAllEnvFiles(*forceFlag); err != nil {
+		if err := cli.GenerateAllEnvFiles(*forceFlag, cli.RealFileSystem{}, cli.RealDirScanner{}, os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -361,152 +356,4 @@ EXAMPLES:
     dotenv-tui --yolo --force                     # Force overwrite existing .env files
     dotenv-tui --upgrade                          # Upgrade to the latest version
  `)
-}
-
-type entryProcessor func([]parser.Entry) []parser.Entry
-
-func generateFile(inputPath string, force bool, outputFilename string, processEntries entryProcessor, parseErrMsg string) error {
-	file, err := os.Open(inputPath)
-	if err != nil {
-		return fmt.Errorf("failed to open input file: %w", err)
-	}
-	defer func() { _ = file.Close() }()
-
-	entries, err := parser.Parse(file)
-	if err != nil {
-		return fmt.Errorf("failed to parse %s: %w", parseErrMsg, err)
-	}
-
-	processedEntries := processEntries(entries)
-
-	outputPath := filepath.Join(filepath.Dir(inputPath), outputFilename)
-
-	if _, err := os.Stat(outputPath); err == nil && !force {
-		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
-	}
-
-	outFile, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer func() { _ = outFile.Close() }()
-
-	if err := parser.Write(outFile, processedEntries); err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
-	}
-
-	fmt.Printf("Generated %s\n", outputPath)
-	return nil
-}
-
-func generateExampleFile(inputPath string, force bool) error {
-	return generateFile(inputPath, force, ".env.example", generator.GenerateExample, ".env file")
-}
-
-func generateEnvFile(inputPath string, force bool) error {
-	return generateFile(inputPath, force, ".env", func(entries []parser.Entry) []parser.Entry {
-		return entries
-	}, ".env.example file")
-}
-
-func scanAndList(dir string) error {
-	if dir == "" {
-		dir = "."
-	}
-
-	files, err := scanner.Scan(dir)
-	if err != nil {
-		return fmt.Errorf("failed to scan directory: %w", err)
-	}
-
-	if len(files) == 0 {
-		fmt.Println("No .env files found")
-		return nil
-	}
-
-	fmt.Printf("Found %d .env file(s):\n", len(files))
-	for _, file := range files {
-		fmt.Printf("  %s\n", file)
-	}
-
-	return nil
-}
-
-func generateAllEnvFiles(force bool) error {
-	exampleFiles, err := scanner.ScanExamples(".")
-	if err != nil {
-		return fmt.Errorf("failed to scan for .env.example files: %w", err)
-	}
-
-	if len(exampleFiles) == 0 {
-		return fmt.Errorf("no .env.example files found")
-	}
-
-	fmt.Printf("Found %d .env.example file(s):\n", len(exampleFiles))
-	for _, file := range exampleFiles {
-		fmt.Printf("  %s\n", file)
-	}
-
-	var generated, skipped int
-	for _, exampleFile := range exampleFiles {
-		if err := processExampleFile(exampleFile, force, &generated, &skipped); err != nil {
-			return err
-		}
-	}
-
-	fmt.Printf("Done: %d generated, %d skipped\n", generated, skipped)
-	return nil
-}
-
-func processExampleFile(exampleFile string, force bool, generated, skipped *int) error {
-	outputPath := strings.TrimSuffix(exampleFile, ".example")
-
-	file, err := os.Open(exampleFile)
-	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", exampleFile, err)
-	}
-
-	entries, err := parser.Parse(file)
-	if err != nil {
-		_ = file.Close()
-		return fmt.Errorf("failed to parse %s: %w", exampleFile, err)
-	}
-
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close %s: %w", exampleFile, err)
-	}
-
-	if _, err := os.Stat(outputPath); err == nil && !force {
-		fmt.Printf("%s already exists. Overwrite? [y/N] ", outputPath)
-		reader := bufio.NewReader(os.Stdin)
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read user input: %w", err)
-		}
-		response = strings.TrimSpace(response)
-
-		if response != "y" && response != "Y" {
-			fmt.Printf("Skipped %s\n", outputPath)
-			*skipped++
-			return nil
-		}
-	}
-
-	outFile, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create %s: %w", outputPath, err)
-	}
-
-	if err := parser.Write(outFile, entries); err != nil {
-		_ = outFile.Close()
-		return fmt.Errorf("failed to write %s: %w", outputPath, err)
-	}
-
-	if err := outFile.Close(); err != nil {
-		return fmt.Errorf("failed to close %s: %w", outputPath, err)
-	}
-
-	fmt.Printf("Generated %s\n", outputPath)
-	*generated++
-	return nil
 }

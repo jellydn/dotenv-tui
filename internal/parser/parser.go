@@ -99,22 +99,27 @@ func parseKeyValue(line string) (KeyValue, error) {
 	return kv, nil
 }
 
+// formatKeyValue converts a KeyValue entry to its string representation.
+func formatKeyValue(kv KeyValue) string {
+	var line string
+	if kv.Exported {
+		line = "export "
+	}
+	line += kv.Key + "="
+	if kv.Quoted != "" {
+		line += kv.Quoted + kv.Value + kv.Quoted
+	} else {
+		line += kv.Value
+	}
+	return line
+}
+
 // Write writes entries to a writer, preserving the original structure
 func Write(writer io.Writer, entries []Entry) error {
 	for _, entry := range entries {
 		switch e := entry.(type) {
 		case KeyValue:
-			var line string
-			if e.Exported {
-				line = "export "
-			}
-			line += e.Key + "="
-			if e.Quoted != "" {
-				line += e.Quoted + e.Value + e.Quoted
-			} else {
-				line += e.Value
-			}
-			if _, err := fmt.Fprintln(writer, line); err != nil {
+			if _, err := fmt.Fprintln(writer, formatKeyValue(e)); err != nil {
 				return err
 			}
 
@@ -139,17 +144,7 @@ func Write(writer io.Writer, entries []Entry) error {
 func EntryToString(entry Entry) string {
 	switch e := entry.(type) {
 	case KeyValue:
-		line := ""
-		if e.Exported {
-			line += "export "
-		}
-		line += e.Key + "="
-		if e.Quoted != "" {
-			line += e.Quoted + e.Value + e.Quoted
-		} else {
-			line += e.Value
-		}
-		return line
+		return formatKeyValue(e)
 	case Comment:
 		return e.Text
 	case BlankLine:
