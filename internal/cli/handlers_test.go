@@ -1,0 +1,415 @@
+package cli
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/jellydn/dotenv-tui/internal/parser"
+)
+
+// mockFileSystem is a mock implementation of FileSystem for testing.
+type mockFileSystem struct {
+	files       map[string]string
+	createError error
+	openError   error
+	statError   error
+}
+
+func newMockFileSystem() *mockFileSystem {
+	return &mockFileSystem{
+		files: make(map[string]string),
+	}
+}
+
+func (m *mockFileSystem) Open(name string) (io.ReadCloser, error) {
+	if m.openError != nil {
+		return nil, m.openError
+	}
+	content, ok := m.files[name]
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	return io.NopCloser(strings.NewReader(content)), nil
+}
+
+func (m *mockFileSystem) Stat(name string) (os.FileInfo, error) {
+	if m.statError != nil {
+		return nil, m.statError
+	}
+	_, ok := m.files[name]
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	// Return a simple mock file info
+	return mockFileInfo{name: name}, nil
+}
+
+func (m *mockFileSystem) Create(name string) (io.WriteCloser, error) {
+	if m.createError != nil {
+		return nil, m.createError
+	}
+	writer := &mockWriteCloser{
+		buffer: &bytes.Buffer{},
+		onClose: func(content string) {
+			m.files[name] = content
+		},
+	}
+	return writer, nil
+}
+
+type mockWriteCloser struct {
+	buffer  *bytes.Buffer
+	onClose func(string)
+	closed  bool
+}
+
+func (m *mockWriteCloser) Write(p []byte) (n int, err error) {
+	return m.buffer.Write(p)
+}
+
+func (m *mockWriteCloser) Close() error {
+	if m.closed {
+		return fmt.Errorf("already closed")
+	}
+	m.closed = true
+	if m.onClose != nil {
+		m.onClose(m.buffer.String())
+	}
+	return nil
+}
+
+type mockFileInfo struct {
+	name string
+}
+
+func (m mockFileInfo) Name() string       { return m.name }
+func (m mockFileInfo) Size() int64        { return 0 }
+func (m mockFileInfo) Mode() os.FileMode  { return 0 }
+func (m mockFileInfo) ModTime() time.Time { return time.Time{} }
+func (m mockFileInfo) IsDir() bool        { return false }
+func (m mockFileInfo) Sys() interface{}   { return nil }
+
+func TestGenerateExampleFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		inputContent   string
+		force          bool
+		existingOutput bool
+		wantErr        bool
+		errContains    string
+		wantOutput     string
+	}{
+		{
+			name: "successful generation",
+			inputContent: "API_KEY=secret123\nPORT=3000\n",
+			force:        false,
+			wantErr:      false,
+			wantOutput:   "API_KEY=***\nPORT=3000\n",
+		},
+		{
+			name:           "file exists without force",
+			inputContent:   "KEY=value\n",
+			force:          false,
+			existingOutput: true,
+			wantErr:        true,
+			errContains:    "already exists",
+		},
+		{
+			name:           "file exists with force",
+			inputContent:   "API_KEY=secret123\n",
+			force:          true,
+			existingOutput: true,
+			wantErr:        false,
+			wantOutput:     "API_KEY=***\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := newMockFileSystem()
+			fs.files["/test/.env"] = tt.inputContent
+			if tt.existingOutput {
+				fs.files["/test/.env.example"] = "existing content"
+			}
+
+			var out bytes.Buffer
+			err := GenerateExampleFile("/test/.env", tt.force, fs, &out)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("error = %v, want substring %q", err, tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if tt.wantOutput != "" {
+					got := fs.files["/test/.env.example"]
+					if got != tt.wantOutput {
+						t.Errorf("output = %q, want %q", got, tt.wantOutput)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateEnvFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		inputContent   string
+		force          bool
+		existingOutput bool
+		wantErr        bool
+		errContains    string
+		wantOutput     string
+	}{
+		{
+			name:         "successful generation from example",
+			inputContent: "API_KEY=***\nPORT=3000\n",
+			force:        false,
+			wantErr:      false,
+			wantOutput:   "API_KEY=***\nPORT=3000\n",
+		},
+		{
+			name:           "file exists without force",
+			inputContent:   "KEY=value\n",
+			force:          false,
+			existingOutput: true,
+			wantErr:        true,
+			errContains:    "already exists",
+		},
+		{
+			name:           "file exists with force",
+			inputContent:   "KEY=value\n",
+			force:          true,
+			existingOutput: true,
+			wantErr:        false,
+			wantOutput:     "KEY=value\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := newMockFileSystem()
+			fs.files["/test/.env.example"] = tt.inputContent
+			if tt.existingOutput {
+				fs.files["/test/.env"] = "existing content"
+			}
+
+			var out bytes.Buffer
+			err := GenerateEnvFile("/test/.env.example", tt.force, fs, &out)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("error = %v, want substring %q", err, tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if tt.wantOutput != "" {
+					got := fs.files["/test/.env"]
+					if got != tt.wantOutput {
+						t.Errorf("output = %q, want %q", got, tt.wantOutput)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestScanAndList(t *testing.T) {
+	tests := []struct {
+		name        string
+		dir         string
+		wantOutput  string
+	}{
+		{
+			name:       "empty directory",
+			dir:        ".",
+			wantOutput: "No .env files found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			err := ScanAndList(tt.dir, &out)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			got := out.String()
+			if !strings.Contains(got, tt.wantOutput) {
+				t.Errorf("output = %q, want substring %q", got, tt.wantOutput)
+			}
+		})
+	}
+}
+
+func TestProcessExampleFile(t *testing.T) {
+	tests := []struct {
+		name          string
+		inputContent  string
+		force         bool
+		userInput     string
+		existingFile  bool
+		wantGenerated int
+		wantSkipped   int
+		wantErr       bool
+	}{
+		{
+			name:          "generate new file",
+			inputContent:  "KEY=value\n",
+			force:         false,
+			existingFile:  false,
+			wantGenerated: 1,
+			wantSkipped:   0,
+			wantErr:       false,
+		},
+		{
+			name:          "force overwrite existing file",
+			inputContent:  "KEY=value\n",
+			force:         true,
+			existingFile:  true,
+			wantGenerated: 1,
+			wantSkipped:   0,
+			wantErr:       false,
+		},
+		{
+			name:          "user says yes to overwrite",
+			inputContent:  "KEY=value\n",
+			force:         false,
+			userInput:     "y\n",
+			existingFile:  true,
+			wantGenerated: 1,
+			wantSkipped:   0,
+			wantErr:       false,
+		},
+		{
+			name:          "user says no to overwrite",
+			inputContent:  "KEY=value\n",
+			force:         false,
+			userInput:     "n\n",
+			existingFile:  true,
+			wantGenerated: 0,
+			wantSkipped:   1,
+			wantErr:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := newMockFileSystem()
+			fs.files["/test/.env.example"] = tt.inputContent
+			if tt.existingFile {
+				fs.files["/test/.env"] = "existing"
+			}
+
+			var out bytes.Buffer
+			in := strings.NewReader(tt.userInput)
+			generated, skipped := 0, 0
+
+			err := ProcessExampleFile("/test/.env.example", tt.force, &generated, &skipped, fs, in, &out)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if generated != tt.wantGenerated {
+					t.Errorf("generated = %d, want %d", generated, tt.wantGenerated)
+				}
+				if skipped != tt.wantSkipped {
+					t.Errorf("skipped = %d, want %d", skipped, tt.wantSkipped)
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		inputContent   string
+		force          bool
+		outputFilename string
+		existingOutput bool
+		wantErr        bool
+		errContains    string
+	}{
+		{
+			name:           "successful generation",
+			inputContent:   "KEY=value\n",
+			force:          false,
+			outputFilename: "output.env",
+			wantErr:        false,
+		},
+		{
+			name:           "existing file without force",
+			inputContent:   "KEY=value\n",
+			force:          false,
+			outputFilename: "output.env",
+			existingOutput: true,
+			wantErr:        true,
+			errContains:    "already exists",
+		},
+		{
+			name:           "invalid input file",
+			inputContent:   "",
+			force:          false,
+			outputFilename: "output.env",
+			wantErr:        true,
+			errContains:    "failed to open input file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := newMockFileSystem()
+			if tt.inputContent != "" {
+				fs.files["/test/input.env"] = tt.inputContent
+			}
+			if tt.existingOutput {
+				fs.files["/test/"+tt.outputFilename] = "existing"
+			}
+
+			var out bytes.Buffer
+			processEntries := func(entries []parser.Entry) []parser.Entry {
+				return entries
+			}
+
+			inputPath := "/test/input.env"
+			if tt.inputContent == "" {
+				inputPath = "/test/nonexistent.env"
+			}
+
+			err := GenerateFile(inputPath, tt.force, tt.outputFilename, processEntries, "test file", fs, &out)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("error = %v, want substring %q", err, tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
