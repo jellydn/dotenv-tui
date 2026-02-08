@@ -30,6 +30,7 @@ type PreviewModel struct {
 	scrollOffset int
 	written      bool
 	writeResults []writeResult
+	windowHeight int
 }
 
 type writeResult struct {
@@ -111,13 +112,26 @@ func (m PreviewModel) Init() tea.Cmd {
 	return nil
 }
 
-const visibleDiffLines = 10
+// SetWindowHeight sets the terminal height for scroll calculations.
+func (m *PreviewModel) SetWindowHeight(h int) {
+	m.windowHeight = h
+}
+
+const previewOverheadLines = 8 // title + position + 2 newlines + scroll info + help + 2 newlines
+
+func (m PreviewModel) visibleLines() int {
+	if m.windowHeight <= previewOverheadLines {
+		return 10 // fallback to default if window is too small
+	}
+	return m.windowHeight - previewOverheadLines
+}
 
 func (m *PreviewModel) adjustScroll() {
+	visible := m.visibleLines()
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
-	} else if m.cursor >= m.scrollOffset+visibleDiffLines {
-		m.scrollOffset = m.cursor - visibleDiffLines + 1
+	} else if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
 	}
 }
 
@@ -141,6 +155,11 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scrollOffset = 0
 		m.written = false
 		m.writeResults = nil
+		return m, nil
+
+	case tea.WindowSizeMsg:
+		m.windowHeight = msg.Height
+		m.adjustScroll()
 		return m, nil
 
 	case tea.KeyMsg:
@@ -252,8 +271,9 @@ func (m PreviewModel) View() string {
 
 	var diff strings.Builder
 
+	visible := m.visibleLines()
 	start := m.scrollOffset
-	end := start + visibleDiffLines
+	end := start + visible
 	if end > len(f.diffLines) {
 		end = len(f.diffLines)
 	}
@@ -279,7 +299,7 @@ func (m PreviewModel) View() string {
 		diff.WriteString(style.Render(cursor+" "+line) + "\n")
 	}
 
-	if len(f.diffLines) > visibleDiffLines {
+	if len(f.diffLines) > visible {
 		scrollInfo := fmt.Sprintf("Line %d/%d", m.cursor+1, len(f.diffLines))
 		diff.WriteString(lipgloss.NewStyle().Faint(true).Render(scrollInfo) + "\n")
 	}
