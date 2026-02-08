@@ -105,7 +105,7 @@ func TestGenerateExampleFile(t *testing.T) {
 		wantOutput     string
 	}{
 		{
-			name: "successful generation",
+			name:         "successful generation",
 			inputContent: "API_KEY=secret123\nPORT=3000\n",
 			force:        false,
 			wantErr:      false,
@@ -230,9 +230,9 @@ func TestGenerateEnvFile(t *testing.T) {
 
 func TestScanAndList(t *testing.T) {
 	tests := []struct {
-		name        string
-		dir         string
-		wantOutput  string
+		name       string
+		dir        string
+		wantOutput string
 	}{
 		{
 			name:       "empty directory",
