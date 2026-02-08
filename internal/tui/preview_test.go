@@ -54,12 +54,8 @@ func TestEntryToString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange: Entry provided in test case
-
-			// Act
 			result := parser.EntryToString(tt.entry)
 
-			// Assert
 			if result != tt.expected {
 				t.Errorf("parser.EntryToString() = %q, expected %q", result, tt.expected)
 			}
@@ -68,60 +64,43 @@ func TestEntryToString(t *testing.T) {
 }
 
 func TestPreviewModelInit(t *testing.T) {
-	// Arrange
-	model := PreviewModel{
-		originalEntries:  []parser.Entry{},
-		generatedEntries: []parser.Entry{},
-		diffLines:        []string{},
-		cursor:           0,
-		scrollOffset:     0,
-		outputPath:       "/test/.env.example",
-		confirmed:        false,
-		success:          false,
-	}
+	model := PreviewModel{}
 
-	// Act
 	cmd := model.Init()
 
-	// Assert
 	if cmd != nil {
 		t.Errorf("PreviewModel.Init() should return nil, got %v", cmd)
 	}
 }
 
 func TestPreviewModelUpdateWithInitMsg(t *testing.T) {
-	// Arrange
 	model := PreviewModel{}
-	originalEntries := []parser.Entry{
-		parser.KeyValue{Key: "KEY", Value: "value", Quoted: "", Exported: false},
-	}
-	generatedEntries := []parser.Entry{
-		parser.KeyValue{Key: "KEY", Value: "placeholder", Quoted: "", Exported: false},
-	}
-	diffLines := []string{"- KEY=value", "+ KEY=placeholder"}
-
-	initMsg := previewInitMsg{
-		originalEntries:  originalEntries,
-		generatedEntries: generatedEntries,
-		diffLines:        diffLines,
-		outputPath:       "/test/.env.example",
+	files := []filePreview{
+		{
+			filePath:   "/test/.env",
+			outputPath: "/test/.env.example",
+			diffLines:  []string{"- KEY=value", "+ KEY=placeholder"},
+			generatedEntries: []parser.Entry{
+				parser.KeyValue{Key: "KEY", Value: "placeholder", Quoted: "", Exported: false},
+			},
+		},
 	}
 
-	// Act
+	initMsg := previewInitMsg{files: files}
+
 	newModel, cmd := model.Update(initMsg)
 
-	// Assert
 	newPreviewModel, ok := newModel.(PreviewModel)
 	if !ok {
 		t.Fatalf("Update() did not return PreviewModel")
 	}
 
-	if len(newPreviewModel.diffLines) != 2 {
-		t.Errorf("Update() diffLines count = %d, expected 2", len(newPreviewModel.diffLines))
+	if len(newPreviewModel.files) != 1 {
+		t.Errorf("Update() files count = %d, expected 1", len(newPreviewModel.files))
 	}
 
-	if newPreviewModel.outputPath != "/test/.env.example" {
-		t.Errorf("Update() outputPath = %q, expected %q", newPreviewModel.outputPath, "/test/.env.example")
+	if newPreviewModel.files[0].outputPath != "/test/.env.example" {
+		t.Errorf("Update() outputPath = %q, expected %q", newPreviewModel.files[0].outputPath, "/test/.env.example")
 	}
 
 	if cmd != nil {
@@ -130,13 +109,14 @@ func TestPreviewModelUpdateWithInitMsg(t *testing.T) {
 }
 
 func TestPreviewModelUpdateNavigation(t *testing.T) {
-	// Arrange
 	diffLines := []string{"line 1", "line 2", "line 3", "line 4", "line 5"}
 	model := PreviewModel{
-		diffLines:    diffLines,
+		files: []filePreview{
+			{diffLines: diffLines},
+		},
+		currentFile:  0,
 		cursor:       1,
 		scrollOffset: 0,
-		confirmed:    false,
 	}
 
 	tests := []struct {
@@ -195,26 +175,15 @@ func TestPreviewModelUpdateNavigation(t *testing.T) {
 			expectedCursor: 4,
 			expectedScroll: 0,
 		},
-		{
-			name:           "down key scrolls when reaching visible area",
-			initialCursor:  9,
-			initialScroll:  0,
-			keyMsg:         tea.KeyMsg{Type: tea.KeyDown},
-			expectedCursor: 9,
-			expectedScroll: 0,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Update model with initial state
 			model.cursor = tt.initialCursor
 			model.scrollOffset = tt.initialScroll
 
-			// Act
 			newModel, cmd := model.Update(tt.keyMsg)
 
-			// Assert
 			newPreviewModel, ok := newModel.(PreviewModel)
 			if !ok {
 				t.Fatalf("Update() did not return PreviewModel")
@@ -235,32 +204,37 @@ func TestPreviewModelUpdateNavigation(t *testing.T) {
 	}
 }
 
-func TestPreviewModelUpdateEnterConfirms(t *testing.T) {
-	// Arrange
+func TestPreviewModelUpdateEnterWritesAll(t *testing.T) {
 	model := PreviewModel{
-		diffLines:    []string{"line 1", "line 2"},
+		files: []filePreview{
+			{
+				filePath:   "/test/.env",
+				outputPath: "/tmp/test.env.example",
+				diffLines:  []string{"line 1", "line 2"},
+				generatedEntries: []parser.Entry{
+					parser.KeyValue{Key: "TEST", Value: "value", Quoted: "", Exported: false},
+				},
+			},
+		},
+		currentFile:  0,
 		cursor:       0,
 		scrollOffset: 0,
-		confirmed:    false,
-		success:      false,
 	}
 
-	// Act
 	enterKey := tea.KeyMsg{Type: tea.KeyEnter}
 	newModel, cmd := model.Update(enterKey)
 
-	// Assert
 	newPreviewModel, ok := newModel.(PreviewModel)
 	if !ok {
 		t.Fatalf("Update() did not return PreviewModel")
 	}
 
-	if !newPreviewModel.confirmed {
-		t.Errorf("Update() enter key should set confirmed to true")
+	if !newPreviewModel.written {
+		t.Errorf("Update() enter key should set written to true")
 	}
 
 	if cmd != nil {
-		t.Errorf("Update() should return nil command, got %v", cmd)
+		t.Errorf("Update() should return nil command after enter, got %v", cmd)
 	}
 }
 
@@ -275,165 +249,109 @@ func TestPreviewModelUpdateQuit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
 			model := PreviewModel{
-				diffLines:    []string{"line 1"},
+				files: []filePreview{
+					{diffLines: []string{"line 1"}},
+				},
+				currentFile:  0,
 				cursor:       0,
 				scrollOffset: 0,
-				confirmed:    false,
 			}
 
-			// Act
 			_, cmd := model.Update(tt.keyMsg)
 
-			// Assert
 			if cmd == nil {
 				t.Errorf("Update(%q) should return a command", tt.name)
 				return
 			}
 
-			// Execute the command
 			msg := cmd()
-			finishedMsg, ok := msg.(PreviewFinishedMsg)
+			_, ok := msg.(PreviewFinishedMsg)
 			if !ok {
 				t.Fatalf("Command did not return PreviewFinishedMsg")
-			}
-
-			if finishedMsg.Success {
-				t.Errorf("PreviewFinishedMsg.Success should be false for quit, got true")
 			}
 		})
 	}
 }
 
-func TestPreviewModelUpdateConfirmedYes(t *testing.T) {
-	// Arrange
+func TestPreviewModelTabSwitchesFile(t *testing.T) {
 	model := PreviewModel{
-		diffLines:    []string{"line 1"},
+		files: []filePreview{
+			{filePath: "file1.env", diffLines: []string{"line 1"}},
+			{filePath: "file2.env", diffLines: []string{"line 2"}},
+		},
+		currentFile:  0,
 		cursor:       0,
 		scrollOffset: 0,
-		confirmed:    true,
-		success:      false,
-		outputPath:   "/tmp/test.env.example",
-		generatedEntries: []parser.Entry{
-			parser.KeyValue{Key: "TEST", Value: "value", Quoted: "", Exported: false},
+	}
+
+	tabKey := tea.KeyMsg{Type: tea.KeyTab}
+	newModel, _ := model.Update(tabKey)
+
+	newPreviewModel := newModel.(PreviewModel)
+	if newPreviewModel.currentFile != 1 {
+		t.Errorf("Tab should switch to file 1, got %d", newPreviewModel.currentFile)
+	}
+
+	// Tab again should wrap to file 0
+	newModel, _ = newPreviewModel.Update(tabKey)
+	newPreviewModel = newModel.(PreviewModel)
+	if newPreviewModel.currentFile != 0 {
+		t.Errorf("Tab should wrap to file 0, got %d", newPreviewModel.currentFile)
+	}
+}
+
+func TestPreviewModelShiftTabSwitchesFile(t *testing.T) {
+	model := PreviewModel{
+		files: []filePreview{
+			{filePath: "file1.env", diffLines: []string{"line 1"}},
+			{filePath: "file2.env", diffLines: []string{"line 2"}},
+		},
+		currentFile:  0,
+		cursor:       0,
+		scrollOffset: 0,
+	}
+
+	shiftTabKey := tea.KeyMsg{Type: tea.KeyShiftTab}
+	newModel, _ := model.Update(shiftTabKey)
+
+	newPreviewModel := newModel.(PreviewModel)
+	if newPreviewModel.currentFile != 1 {
+		t.Errorf("Shift+Tab from 0 should wrap to file 1, got %d", newPreviewModel.currentFile)
+	}
+}
+
+func TestPreviewModelWrittenStateEnterFinishes(t *testing.T) {
+	model := PreviewModel{
+		files: []filePreview{
+			{filePath: "file1.env", diffLines: []string{"line 1"}},
+		},
+		currentFile: 0,
+		written:     true,
+		writeResults: []writeResult{
+			{OutputPath: "/test/.env.example", Success: true},
 		},
 	}
 
-	// Act
-	yKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}
-	newModel, cmd := model.Update(yKey)
+	enterKey := tea.KeyMsg{Type: tea.KeyEnter}
+	_, cmd := model.Update(enterKey)
 
-	// Assert
-	newPreviewModel, ok := newModel.(PreviewModel)
+	if cmd == nil {
+		t.Fatal("Enter in written state should return a command")
+	}
+
+	msg := cmd()
+	finishedMsg, ok := msg.(PreviewFinishedMsg)
 	if !ok {
-		t.Fatalf("Update() did not return PreviewModel")
+		t.Fatalf("Command did not return PreviewFinishedMsg")
 	}
 
-	// Success should be true after write (file may or may not be created based on permissions)
-	// In a test environment, the write might fail, so we just check the model state
-	if !newPreviewModel.success {
-		// This is expected if file write fails in test environment
-		// The important thing is that the Update method handled the key correctly
-		_ = newPreviewModel.success // Use the variable to avoid lint error
-	}
-
-	if cmd != nil {
-		t.Errorf("Update() should return nil command after y key, got %v", cmd)
-	}
-}
-
-func TestPreviewModelUpdateConfirmedNo(t *testing.T) {
-	tests := []struct {
-		name   string
-		keyMsg tea.KeyMsg
-	}{
-		{name: "n key cancels", keyMsg: tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}},
-		{name: "N key cancels", keyMsg: tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'N'}}},
-		{name: "q key cancels", keyMsg: tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}},
-		{name: "esc key cancels", keyMsg: tea.KeyMsg{Type: tea.KeyEsc}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
-			model := PreviewModel{
-				diffLines:    []string{"line 1"},
-				cursor:       0,
-				scrollOffset: 0,
-				confirmed:    true,
-				success:      false,
-			}
-
-			// Act
-			_, cmd := model.Update(tt.keyMsg)
-
-			// Assert
-			if cmd == nil {
-				t.Errorf("Update(%q) should return a command", tt.name)
-				return
-			}
-
-			// Execute the command
-			msg := cmd()
-			finishedMsg, ok := msg.(PreviewFinishedMsg)
-			if !ok {
-				t.Fatalf("Command did not return PreviewFinishedMsg")
-			}
-
-			if finishedMsg.Success {
-				t.Errorf("PreviewFinishedMsg.Success should be false for cancel, got true")
-			}
-		})
-	}
-}
-
-func TestPreviewModelUpdateSuccessState(t *testing.T) {
-	tests := []struct {
-		name   string
-		keyMsg tea.KeyMsg
-	}{
-		{name: "enter key quits", keyMsg: tea.KeyMsg{Type: tea.KeyEnter}},
-		{name: "q key quits", keyMsg: tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}},
-		{name: "esc key quits", keyMsg: tea.KeyMsg{Type: tea.KeyEsc}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
-			model := PreviewModel{
-				diffLines:    []string{"line 1"},
-				cursor:       0,
-				scrollOffset: 0,
-				confirmed:    true,
-				success:      true,
-			}
-
-			// Act
-			_, cmd := model.Update(tt.keyMsg)
-
-			// Assert
-			if cmd == nil {
-				t.Errorf("Update(%q) should return a command", tt.name)
-				return
-			}
-
-			// Execute the command
-			msg := cmd()
-			finishedMsg, ok := msg.(PreviewFinishedMsg)
-			if !ok {
-				t.Fatalf("Command did not return PreviewFinishedMsg")
-			}
-
-			if !finishedMsg.Success {
-				t.Errorf("PreviewFinishedMsg.Success should be true in success state, got false")
-			}
-		})
+	if len(finishedMsg.Results) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(finishedMsg.Results))
 	}
 }
 
 func TestEntryToStringComplex(t *testing.T) {
-	// Test that entryToString handles all entry types correctly
 	tests := []struct {
 		name     string
 		entry    parser.Entry
@@ -463,13 +381,8 @@ func TestEntryToStringComplex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
-			entry := tt.entry
+			result := parser.EntryToString(tt.entry)
 
-			// Act
-			result := parser.EntryToString(entry)
-
-			// Assert
 			if !strings.Contains(result, tt.contains) {
 				t.Errorf("parser.EntryToString() result %q does not contain %q", result, tt.contains)
 			}
