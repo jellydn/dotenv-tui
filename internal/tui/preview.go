@@ -14,94 +14,96 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// PreviewModel is the Bubble Tea model for previewing .env.example diffs.
-type PreviewModel struct {
-	originalEntries  []parser.Entry
+type filePreview struct {
+	filePath         string
+	outputPath       string
 	generatedEntries []parser.Entry
 	diffLines        []string
-	cursor           int
-	scrollOffset     int
-	outputPath       string
-	confirmed        bool
-	success          bool
-	fileIndex        int
-	totalFiles       int
-	filePath         string
+	errMsg           string
 }
 
-// PreviewFinishedMsg signals the preview has completed with success status.
+// PreviewModel is the Bubble Tea model for previewing .env.example diffs.
+type PreviewModel struct {
+	files        []filePreview
+	currentFile  int
+	cursor       int
+	scrollOffset int
+	written      bool
+	writeResults []writeResult
+}
+
+type writeResult struct {
+	OutputPath string
+	Success    bool
+	Error      string
+}
+
+// PreviewFinishedMsg signals the preview has completed.
 type PreviewFinishedMsg struct {
-	Success bool
-}
-
-// NewPreviewModel creates a preview for the generated .env.example output.
-func NewPreviewModel(filePath string, fileIndex, totalFiles int) tea.Cmd {
-	return func() tea.Msg {
-		file, err := os.Open(filePath)
-		if err != nil {
-			return previewInitMsg{
-				originalEntries:  []parser.Entry{},
-				generatedEntries: []parser.Entry{},
-				diffLines:        []string{fmt.Sprintf("Error reading file: %v", err)},
-				outputPath:       filepath.Join(filepath.Dir(filePath), ".env.example"),
-				fileIndex:        fileIndex,
-				totalFiles:       totalFiles,
-				filePath:         filePath,
-			}
-		}
-		defer func() { _ = file.Close() }()
-
-		originalEntries, err := parser.Parse(file)
-		if err != nil {
-			return previewInitMsg{
-				originalEntries:  []parser.Entry{},
-				generatedEntries: []parser.Entry{},
-				diffLines:        []string{fmt.Sprintf("Error parsing file: %v", err)},
-				outputPath:       filepath.Join(filepath.Dir(filePath), ".env.example"),
-				fileIndex:        fileIndex,
-				totalFiles:       totalFiles,
-				filePath:         filePath,
-			}
-		}
-
-		generatedEntries := generator.GenerateExample(originalEntries)
-
-		var diffLines []string
-		for i, orig := range originalEntries {
-			if i < len(generatedEntries) {
-				origLine := parser.EntryToString(orig)
-				genLine := parser.EntryToString(generatedEntries[i])
-
-				if origLine == genLine {
-					diffLines = append(diffLines, fmt.Sprintf("  %s", origLine))
-				} else {
-					diffLines = append(diffLines, fmt.Sprintf("  %s [masked]", genLine))
-				}
-			}
-		}
-
-		outputPath := filepath.Join(filepath.Dir(filePath), ".env.example")
-
-		return previewInitMsg{
-			originalEntries:  originalEntries,
-			generatedEntries: generatedEntries,
-			diffLines:        diffLines,
-			outputPath:       outputPath,
-			fileIndex:        fileIndex,
-			totalFiles:       totalFiles,
-			filePath:         filePath,
-		}
-	}
+	Results []writeResult
 }
 
 type previewInitMsg struct {
-	originalEntries  []parser.Entry
-	generatedEntries []parser.Entry
-	diffLines        []string
-	outputPath       string
-	fileIndex        int
-	totalFiles       int
-	filePath         string
+	files []filePreview
+}
+
+// NewPreviewModel creates a preview for multiple files at once.
+func NewPreviewModel(filePaths []string) tea.Cmd {
+	return func() tea.Msg {
+		var files []filePreview
+		for _, fp := range filePaths {
+			files = append(files, loadFilePreview(fp))
+		}
+		return previewInitMsg{files: files}
+	}
+}
+
+func loadFilePreview(filePath string) filePreview {
+	outputPath := filepath.Join(filepath.Dir(filePath), ".env.example")
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return filePreview{
+			filePath:   filePath,
+			outputPath: outputPath,
+			diffLines:  []string{fmt.Sprintf("Error reading file: %v", err)},
+			errMsg:     err.Error(),
+		}
+	}
+	defer func() { _ = file.Close() }()
+
+	originalEntries, err := parser.Parse(file)
+	if err != nil {
+		return filePreview{
+			filePath:   filePath,
+			outputPath: outputPath,
+			diffLines:  []string{fmt.Sprintf("Error parsing file: %v", err)},
+			errMsg:     err.Error(),
+		}
+	}
+
+	generatedEntries := generator.GenerateExample(originalEntries)
+
+	var diffLines []string
+	for i, orig := range originalEntries {
+		if i < len(generatedEntries) {
+			origLine := parser.EntryToString(orig)
+			genLine := parser.EntryToString(generatedEntries[i])
+
+			if origLine == genLine {
+				diffLines = append(diffLines, fmt.Sprintf("  %s", origLine))
+			} else {
+				diffLines = append(diffLines, fmt.Sprintf("  %s [masked]", genLine))
+			}
+		}
+	}
+
+	return filePreview{
+		filePath:         filePath,
+		outputPath:       outputPath,
+		generatedEntries: generatedEntries,
+		diffLines:        diffLines,
+	}
 }
 
 // Init initializes the preview model.
@@ -111,8 +113,6 @@ func (m PreviewModel) Init() tea.Cmd {
 
 const visibleDiffLines = 10
 
-// adjustScroll ensures the cursor remains visible by adjusting scrollOffset
-// when the cursor moves outside the currently visible area.
 func (m *PreviewModel) adjustScroll() {
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
@@ -121,80 +121,117 @@ func (m *PreviewModel) adjustScroll() {
 	}
 }
 
+func (m *PreviewModel) switchFile(dir int) {
+	n := len(m.files)
+	if n <= 1 {
+		return
+	}
+	m.currentFile = (m.currentFile + dir + n) % n
+	m.cursor = 0
+	m.scrollOffset = 0
+}
+
 // Update handles messages and updates the preview model.
 func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case previewInitMsg:
-		m.originalEntries = msg.originalEntries
-		m.generatedEntries = msg.generatedEntries
-		m.diffLines = msg.diffLines
-		m.outputPath = msg.outputPath
-		m.fileIndex = msg.fileIndex
-		m.totalFiles = msg.totalFiles
-		m.filePath = msg.filePath
+		m.files = msg.files
+		m.currentFile = 0
+		m.cursor = 0
+		m.scrollOffset = 0
+		m.written = false
+		m.writeResults = nil
 		return m, nil
 
 	case tea.KeyMsg:
-		switch {
-		case m.confirmed && m.success:
+		if m.written {
 			switch msg.String() {
 			case "enter", "q", "esc":
 				return m, func() tea.Msg {
-					return PreviewFinishedMsg{Success: true}
+					return PreviewFinishedMsg{Results: m.writeResults}
 				}
 			}
-		case m.confirmed:
-			switch msg.String() {
-			case "y", "Y", "enter":
-				if err := m.writeFile(); err != nil {
-					m.success = false
-					return m, nil
-				}
-				m.success = true
-				return m, nil
-			case "n", "N", "q", "esc":
-				return m, func() tea.Msg {
-					return PreviewFinishedMsg{Success: false}
-				}
+			return m, nil
+		}
+
+		switch msg.String() {
+		case "tab":
+			m.switchFile(1)
+		case "shift+tab":
+			m.switchFile(-1)
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+				m.adjustScroll()
 			}
-		default:
-			switch msg.String() {
-			case "up", "k":
-				if m.cursor > 0 {
-					m.cursor--
-					m.adjustScroll()
-				}
-			case "down", "j":
-				if m.cursor < len(m.diffLines)-1 {
-					m.cursor++
-					m.adjustScroll()
-				}
-			case "enter":
-				m.confirmed = true
-			case "q", "esc":
-				return m, func() tea.Msg {
-					return PreviewFinishedMsg{Success: false}
-				}
+		case "down", "j":
+			f := m.files[m.currentFile]
+			if m.cursor < len(f.diffLines)-1 {
+				m.cursor++
+				m.adjustScroll()
+			}
+		case "enter":
+			m.writeResults = m.writeAllFiles()
+			m.written = true
+		case "q", "esc":
+			return m, func() tea.Msg {
+				return PreviewFinishedMsg{}
 			}
 		}
 	}
 	return m, nil
 }
 
-// writeFile writes the generated entries to the output .env.example file.
-func (m PreviewModel) writeFile() error {
-	file, err := os.OpenFile(m.outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+func (m PreviewModel) writeAllFiles() []writeResult {
+	var results []writeResult
+	for _, f := range m.files {
+		if f.errMsg != "" {
+			results = append(results, writeResult{
+				OutputPath: f.outputPath,
+				Success:    false,
+				Error:      f.errMsg,
+			})
+			continue
+		}
+		err := writePreviewFile(f.outputPath, f.generatedEntries)
+		if err != nil {
+			results = append(results, writeResult{
+				OutputPath: f.outputPath,
+				Success:    false,
+				Error:      err.Error(),
+			})
+		} else {
+			results = append(results, writeResult{
+				OutputPath: f.outputPath,
+				Success:    true,
+			})
+		}
+	}
+	return results
+}
+
+func writePreviewFile(outputPath string, entries []parser.Entry) error {
+	file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = file.Close() }()
-
-	return parser.Write(file, m.generatedEntries)
+	return parser.Write(file, entries)
 }
 
 // View renders the diff preview UI.
 func (m PreviewModel) View() string {
-	positionText := fmt.Sprintf("[%d/%d] %s", m.fileIndex+1, m.totalFiles, m.filePath)
+	if len(m.files) == 0 {
+		return "\nNo files to preview\n"
+	}
+
+	if m.written {
+		return m.viewWriteResults()
+	}
+
+	f := m.files[m.currentFile]
+
+	positionText := fmt.Sprintf("[%d/%d] %s", m.currentFile+1, len(m.files), f.filePath)
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#FAFAFA")).
@@ -206,52 +243,26 @@ func (m PreviewModel) View() string {
 		Faint(true).
 		Render(positionText)
 
-	if m.confirmed && m.success {
-		successMsg := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#00FF00")).
-			Bold(true).
-			Render(fmt.Sprintf("✓ Successfully wrote %s", m.outputPath))
-
-		continueMsg := lipgloss.NewStyle().
-			Faint(true).
-			Render("Press Enter to continue")
-
-		return "\n" + title + "\n" + position + "\n\n" + successMsg + "\n\n" + continueMsg + "\n"
-	}
-
-	if m.confirmed {
-		confirmMsg := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFF00")).
-			Render(fmt.Sprintf("Write changes to %s?", m.outputPath))
-
-		help := lipgloss.NewStyle().
-			Faint(true).
-			Render("Y/Enter: yes • N: no • Q/Esc: cancel")
-
-		return "\n" + title + "\n" + position + "\n\n" + confirmMsg + "\n\n" + help + "\n"
-	}
-
 	var diff strings.Builder
 
 	start := m.scrollOffset
 	end := start + visibleDiffLines
-	if end > len(m.diffLines) {
-		end = len(m.diffLines)
+	if end > len(f.diffLines) {
+		end = len(f.diffLines)
 	}
 
 	for i := start; i < end; i++ {
-		line := m.diffLines[i]
+		line := f.diffLines[i]
 		cursor := " "
 		if i == m.cursor {
 			cursor = ">"
 		}
 
-		// Apply colors: green for unchanged, yellow for masked
 		style := lipgloss.NewStyle()
 		if strings.Contains(line, "[masked]") {
-			style = style.Foreground(lipgloss.Color("#FFFF00")) // Yellow for masked
+			style = style.Foreground(lipgloss.Color("#FFFF00"))
 		} else {
-			style = style.Foreground(lipgloss.Color("#00FF00")) // Green for unchanged
+			style = style.Foreground(lipgloss.Color("#00FF00"))
 		}
 
 		if i == m.cursor {
@@ -261,14 +272,54 @@ func (m PreviewModel) View() string {
 		diff.WriteString(style.Render(cursor+" "+line) + "\n")
 	}
 
-	if len(m.diffLines) > visibleDiffLines {
-		scrollInfo := fmt.Sprintf("Line %d/%d", m.cursor+1, len(m.diffLines))
+	if len(f.diffLines) > visibleDiffLines {
+		scrollInfo := fmt.Sprintf("Line %d/%d", m.cursor+1, len(f.diffLines))
 		diff.WriteString(lipgloss.NewStyle().Faint(true).Render(scrollInfo) + "\n")
 	}
 
+	helpParts := []string{"↑/k: up", "↓/j: down"}
+	if len(m.files) > 1 {
+		helpParts = append(helpParts, "Tab: next file", "Shift+Tab: prev file")
+	}
+	helpParts = append(helpParts, "Enter: write all", "q/Esc: cancel")
+
 	help := lipgloss.NewStyle().
 		Faint(true).
-		Render("↑/k: up • ↓/j: down • Enter: confirm • Q/Esc: cancel")
+		Render(strings.Join(helpParts, " • "))
 
 	return "\n" + title + "\n" + position + "\n\n" + diff.String() + "\n" + help + "\n"
+}
+
+func (m PreviewModel) viewWriteResults() string {
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FAFAFA")).
+		Background(lipgloss.Color("#7D56F4")).
+		Padding(0, 1).
+		Render(".env.example Generation Complete")
+
+	var lines strings.Builder
+	successCount := 0
+	for _, r := range m.writeResults {
+		if r.Success {
+			successCount++
+			line := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#00FF00")).
+				Render(fmt.Sprintf("  ✓ %s", r.OutputPath))
+			lines.WriteString(line + "\n")
+		} else {
+			line := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FF5F56")).
+				Render(fmt.Sprintf("  ✗ %s: %s", r.OutputPath, r.Error))
+			lines.WriteString(line + "\n")
+		}
+	}
+
+	summary := fmt.Sprintf("Wrote %d/%d files", successCount, len(m.writeResults))
+
+	help := lipgloss.NewStyle().
+		Faint(true).
+		Render("Press Enter or q to return to menu")
+
+	return "\n" + title + "\n\n" + lines.String() + "\n" + summary + "\n\n" + help + "\n"
 }
