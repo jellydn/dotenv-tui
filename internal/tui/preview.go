@@ -144,6 +144,13 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if len(m.files) == 0 {
+			if msg.String() == "q" || msg.String() == "esc" {
+				return m, func() tea.Msg { return PreviewFinishedMsg{} }
+			}
+			return m, nil
+		}
+
 		if m.written {
 			switch msg.String() {
 			case "enter", "q", "esc":

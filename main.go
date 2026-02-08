@@ -146,19 +146,14 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	formModel, formCmd := m.form.Update(msg)
 	m.form = formModel.(tui.FormModel)
 
-	switch msg := msg.(type) {
-	case tui.FormFinishedMsg:
-		if msg.Dir == 0 {
+	if finishedMsg, ok := msg.(tui.FormFinishedMsg); ok {
+		if finishedMsg.Dir == 0 {
 			return returnToMenu(m), nil
 		}
 		n := len(m.fileList)
-		m.fileIndex = (m.fileIndex + msg.Dir + n) % n
+		m.fileIndex = (m.fileIndex + finishedMsg.Dir + n) % n
 		m.currentScreen = formScreen
 		return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, n)
-	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "esc" {
-			return returnToMenu(m), nil
-		}
 	}
 
 	return m, formCmd

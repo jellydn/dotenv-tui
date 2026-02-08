@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -205,11 +207,15 @@ func TestPreviewModelUpdateNavigation(t *testing.T) {
 }
 
 func TestPreviewModelUpdateEnterWritesAll(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "test.env.example")
+
 	model := PreviewModel{
 		files: []filePreview{
 			{
 				filePath:   "/test/.env",
-				outputPath: "/tmp/test.env.example",
+				outputPath: outputPath,
 				diffLines:  []string{"line 1", "line 2"},
 				generatedEntries: []parser.Entry{
 					parser.KeyValue{Key: "TEST", Value: "value", Quoted: "", Exported: false},
@@ -235,6 +241,11 @@ func TestPreviewModelUpdateEnterWritesAll(t *testing.T) {
 
 	if cmd != nil {
 		t.Errorf("Update() should return nil command after enter, got %v", cmd)
+	}
+
+	// Verify file was written
+	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+		t.Errorf("Expected file to be written at %s", outputPath)
 	}
 }
 
