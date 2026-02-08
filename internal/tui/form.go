@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jellydn/dotenv-tui/internal/backup"
 	"github.com/jellydn/dotenv-tui/internal/parser"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -310,6 +311,11 @@ func (m FormModel) saveForm() tea.Cmd {
 			case parser.Comment, parser.BlankLine:
 				entries = append(entries, e)
 			}
+		}
+
+		// Create backup before overwriting (TUI always creates backups by default)
+		if _, err := backup.CreateBackup(outputPath); err != nil {
+			return FormSavedMsg{Success: false, Error: fmt.Sprintf("Failed to create backup: %v", err)}
 		}
 
 		file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)

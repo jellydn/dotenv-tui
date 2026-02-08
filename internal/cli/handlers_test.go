@@ -153,7 +153,7 @@ func TestGenerateExampleFile(t *testing.T) {
 			}
 
 			var out bytes.Buffer
-			err := GenerateExampleFile("/test/.env", tt.force, fs, &out)
+			err := GenerateExampleFile("/test/.env", tt.force, true, fs, &out)
 
 			if tt.wantErr {
 				if err == nil {
@@ -220,7 +220,7 @@ func TestGenerateEnvFile(t *testing.T) {
 			}
 
 			var out bytes.Buffer
-			err := GenerateEnvFile("/test/.env.example", tt.force, fs, &out)
+			err := GenerateEnvFile("/test/.env.example", tt.force, true, fs, &out)
 
 			if tt.wantErr {
 				if err == nil {
@@ -360,7 +360,7 @@ func TestProcessExampleFile(t *testing.T) {
 			in := strings.NewReader(tt.userInput)
 			generated, skipped := 0, 0
 
-			err := ProcessExampleFile("/test/.env.example", tt.force, &generated, &skipped, fs, in, &out)
+			err := ProcessExampleFile("/test/.env.example", tt.force, true, &generated, &skipped, fs, in, &out)
 
 			if tt.wantErr {
 				if err == nil {
@@ -437,7 +437,7 @@ func TestGenerateFile(t *testing.T) {
 				inputPath = "/test/nonexistent.env"
 			}
 
-			err := GenerateFile(inputPath, tt.force, tt.outputFilename, processEntries, "test file", fs, &out)
+			err := GenerateFile(inputPath, tt.force, true, tt.outputFilename, processEntries, "test file", fs, &out)
 
 			if tt.wantErr {
 				if err == nil {

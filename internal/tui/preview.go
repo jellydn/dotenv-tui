@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jellydn/dotenv-tui/internal/backup"
 	"github.com/jellydn/dotenv-tui/internal/generator"
 	"github.com/jellydn/dotenv-tui/internal/parser"
 
@@ -237,6 +238,11 @@ func (m PreviewModel) writeAllFiles() []writeResult {
 }
 
 func writePreviewFile(outputPath string, entries []parser.Entry) error {
+	// Create backup before overwriting (TUI always creates backups by default)
+	if _, err := backup.CreateBackup(outputPath); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+
 	file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
