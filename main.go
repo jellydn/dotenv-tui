@@ -114,6 +114,7 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 			if msg.Mode == tui.GenerateExample {
 				m.currentScreen = previewScreen
+				m.preview.SetWindowHeight(m.windowHeight)
 				return m, tui.NewPreviewModel(msg.Selected)
 			}
 			if msg.Mode == tui.GenerateEnv {

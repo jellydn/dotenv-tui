@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -396,6 +397,109 @@ func TestEntryToStringComplex(t *testing.T) {
 
 			if !strings.Contains(result, tt.contains) {
 				t.Errorf("parser.EntryToString() result %q does not contain %q", result, tt.contains)
+			}
+		})
+	}
+}
+
+func TestPreviewModelSetWindowHeight(t *testing.T) {
+	t.Run("window height is set correctly", func(t *testing.T) {
+		m := &PreviewModel{}
+
+		m.SetWindowHeight(50)
+
+		if m.windowHeight != 50 {
+			t.Errorf("windowHeight = %d, expected 50", m.windowHeight)
+		}
+	})
+}
+
+func TestPreviewModelWindowSizeMsg(t *testing.T) {
+	t.Run("window size message updates height", func(t *testing.T) {
+		model := PreviewModel{
+			files: []filePreview{
+				{diffLines: []string{"line 1", "line 2", "line 3"}},
+			},
+			currentFile:  0,
+			cursor:       0,
+			scrollOffset: 0,
+			windowHeight: 20,
+		}
+
+		newModel, _ := model.Update(tea.WindowSizeMsg{Height: 40})
+		m := newModel.(PreviewModel)
+
+		if m.windowHeight != 40 {
+			t.Errorf("windowHeight = %d, expected 40", m.windowHeight)
+		}
+	})
+
+	t.Run("window resize adjusts scroll to keep cursor visible", func(t *testing.T) {
+		diffLines := make([]string, 50)
+		for i := range diffLines {
+			diffLines[i] = fmt.Sprintf("line %d", i)
+		}
+
+		model := PreviewModel{
+			files: []filePreview{
+				{diffLines: diffLines},
+			},
+			currentFile:  0,
+			cursor:       30,
+			scrollOffset: 25,
+			windowHeight: 20,
+		}
+
+		newModel, _ := model.Update(tea.WindowSizeMsg{Height: 40})
+		m := newModel.(PreviewModel)
+
+		visible := m.visibleLines()
+		if m.cursor < m.scrollOffset || m.cursor >= m.scrollOffset+visible {
+			t.Errorf("cursor at position %d is not visible after window resize (offset=%d, visible=%d)", m.cursor, m.scrollOffset, visible)
+		}
+	})
+}
+
+func TestPreviewModelVisibleLines(t *testing.T) {
+	tests := []struct {
+		name         string
+		windowHeight int
+		expected     int
+	}{
+		{
+			name:         "normal window height",
+			windowHeight: 30,
+			expected:     22, // 30 - 8 overhead
+		},
+		{
+			name:         "large window height",
+			windowHeight: 60,
+			expected:     52, // 60 - 8 overhead
+		},
+		{
+			name:         "small window height uses fallback",
+			windowHeight: 5,
+			expected:     10, // fallback value
+		},
+		{
+			name:         "exactly at threshold uses fallback",
+			windowHeight: 8,
+			expected:     10, // fallback value
+		},
+		{
+			name:         "zero window height uses fallback",
+			windowHeight: 0,
+			expected:     10, // fallback value
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := PreviewModel{windowHeight: tt.windowHeight}
+			visible := m.visibleLines()
+
+			if visible != tt.expected {
+				t.Errorf("visibleLines() = %d, expected %d", visible, tt.expected)
 			}
 		})
 	}
