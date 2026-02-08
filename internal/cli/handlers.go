@@ -73,7 +73,7 @@ func GenerateFile(inputPath string, force bool, outputFilename string, processEn
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
-	fmt.Fprintf(out, "Generated %s\n", outputPath)
+	_, _ = fmt.Fprintf(out, "Generated %s\n", outputPath)
 	return nil
 }
 
@@ -101,13 +101,13 @@ func ScanAndList(dir string, out io.Writer) error {
 	}
 
 	if len(files) == 0 {
-		fmt.Fprintln(out, "No .env files found")
+		_, _ = fmt.Fprintln(out, "No .env files found")
 		return nil
 	}
 
-	fmt.Fprintf(out, "Found %d .env file(s):\n", len(files))
+	_, _ = fmt.Fprintf(out, "Found %d .env file(s):\n", len(files))
 	for _, file := range files {
-		fmt.Fprintf(out, "  %s\n", file)
+		_, _ = fmt.Fprintf(out, "  %s\n", file)
 	}
 
 	return nil
@@ -124,9 +124,9 @@ func GenerateAllEnvFiles(force bool, fs FileSystem, in io.Reader, out io.Writer)
 		return fmt.Errorf("no .env.example files found")
 	}
 
-	fmt.Fprintf(out, "Found %d .env.example file(s):\n", len(exampleFiles))
+	_, _ = fmt.Fprintf(out, "Found %d .env.example file(s):\n", len(exampleFiles))
 	for _, file := range exampleFiles {
-		fmt.Fprintf(out, "  %s\n", file)
+		_, _ = fmt.Fprintf(out, "  %s\n", file)
 	}
 
 	var generated, skipped int
@@ -136,7 +136,7 @@ func GenerateAllEnvFiles(force bool, fs FileSystem, in io.Reader, out io.Writer)
 		}
 	}
 
-	fmt.Fprintf(out, "Done: %d generated, %d skipped\n", generated, skipped)
+	_, _ = fmt.Fprintf(out, "Done: %d generated, %d skipped\n", generated, skipped)
 	return nil
 }
 
@@ -144,52 +144,77 @@ func GenerateAllEnvFiles(force bool, fs FileSystem, in io.Reader, out io.Writer)
 func ProcessExampleFile(exampleFile string, force bool, generated, skipped *int, fs FileSystem, in io.Reader, out io.Writer) error {
 	outputPath := strings.TrimSuffix(exampleFile, ".example")
 
-	file, err := fs.Open(exampleFile)
+	entries, err := parseAndClose(exampleFile, fs)
 	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", exampleFile, err)
+		return err
 	}
 
-	entries, err := parser.Parse(file)
-	if err != nil {
-		_ = file.Close()
-		return fmt.Errorf("failed to parse %s: %w", exampleFile, err)
-	}
-
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close %s: %w", exampleFile, err)
-	}
-
-	if _, err := fs.Stat(outputPath); err == nil && !force {
-		fmt.Fprintf(out, "%s already exists. Overwrite? [y/N] ", outputPath)
-		reader := bufio.NewReader(in)
-		response, err := reader.ReadString('\n')
+	if !force && fileExists(fs, outputPath) {
+		confirmed, err := confirmOverwrite(out, outputPath, in)
 		if err != nil {
-			return fmt.Errorf("failed to read user input: %w", err)
+			return err
 		}
-		response = strings.TrimSpace(response)
-
-		if response != "y" && response != "Y" {
-			fmt.Fprintf(out, "Skipped %s\n", outputPath)
+		if !confirmed {
+			_, _ = fmt.Fprintf(out, "Skipped %s\n", outputPath)
 			*skipped++
 			return nil
 		}
 	}
 
-	outFile, err := fs.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create %s: %w", outputPath, err)
+	if err := writeEntries(outputPath, fs, entries); err != nil {
+		return err
 	}
+
+	_, _ = fmt.Fprintf(out, "Generated %s\n", outputPath)
+	*generated++
+	return nil
+}
+
+// fileExists checks if a file exists.
+func fileExists(fs FileSystem, path string) bool {
+	_, err := fs.Stat(path)
+	return err == nil
+}
+
+// confirmOverwrite asks the user to confirm overwriting an existing file.
+func confirmOverwrite(out io.Writer, path string, in io.Reader) (bool, error) {
+	_, _ = fmt.Fprintf(out, "%s already exists. Overwrite? [y/N] ", path)
+	reader := bufio.NewReader(in)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false, fmt.Errorf("failed to read user input: %w", err)
+	}
+	response = strings.TrimSpace(response)
+	return response == "y" || response == "Y", nil
+}
+
+// parseAndClose opens, parses, and closes a file.
+func parseAndClose(path string, fs FileSystem) ([]parser.Entry, error) {
+	file, err := fs.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %w", path, err)
+	}
+	defer func() { _ = file.Close() }()
+
+	entries, err := parser.Parse(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+	}
+
+	return entries, nil
+}
+
+// writeEntries creates a file and writes entries to it.
+func writeEntries(path string, fs FileSystem, entries []parser.Entry) error {
+	outFile, err := fs.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create %s: %w", path, err)
+	}
+	defer func() { _ = outFile.Close() }()
 
 	if err := parser.Write(outFile, entries); err != nil {
-		_ = outFile.Close()
-		return fmt.Errorf("failed to write %s: %w", outputPath, err)
+		return fmt.Errorf("failed to write %s: %w", path, err)
 	}
 
-	if err := outFile.Close(); err != nil {
-		return fmt.Errorf("failed to close %s: %w", outputPath, err)
-	}
-
-	fmt.Fprintf(out, "Generated %s\n", outputPath)
-	*generated++
 	return nil
 }

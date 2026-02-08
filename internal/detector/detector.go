@@ -59,41 +59,67 @@ func IsSecret(key string, value string) bool {
 // GeneratePlaceholder creates a format-hint placeholder for a secret.
 // The key parameter is kept for API consistency but not currently used.
 func GeneratePlaceholder(_ string, value string) string {
+	// Early return for empty values
+	if len(value) == 0 {
+		return "***"
+	}
+
+	// JWT tokens
 	if strings.HasPrefix(value, "eyJ") && len(value) > 50 {
 		return "eyJ***"
 	}
 
+	// URL patterns
 	if strings.Contains(value, "://") && strings.Contains(value, "@") {
-		if strings.HasPrefix(value, "http://") {
-			return "http://***"
-		}
-		if strings.HasPrefix(value, "https://") {
-			return "https://***"
-		}
-		return "***"
+		return generateUrlPlaceholder(value)
 	}
 
+	// Check known prefixes (case-insensitive)
 	lowerValue := strings.ToLower(value)
-	if strings.HasPrefix(lowerValue, "sk_live_") || strings.HasPrefix(lowerValue, "sk_test_") {
-		return "sk_***"
-	}
-	if strings.HasPrefix(lowerValue, "ghp_") || strings.HasPrefix(lowerValue, "gho_") || strings.HasPrefix(lowerValue, "ghu_") {
-		return "ghp_***"
-	}
-	if strings.HasPrefix(lowerValue, "pk_test_") || strings.HasPrefix(lowerValue, "pk_live_") {
-		return "pk_***"
-	}
-	if strings.HasPrefix(lowerValue, "xoxb-") || strings.HasPrefix(lowerValue, "xoxp-") {
-		return "xox***"
-	}
-	if strings.HasPrefix(lowerValue, "ya29.") {
-		return "ya29.***"
-	}
-	if strings.HasPrefix(lowerValue, "ssh-rsa") || strings.HasPrefix(lowerValue, "ssh-ed25519") {
-		return "ssh-***"
+	if placeholder := findPrefixPlaceholder(lowerValue); placeholder != "" {
+		return placeholder
 	}
 
 	return "***"
+}
+
+// generateUrlPlaceholder creates a placeholder for URL-style values.
+func generateUrlPlaceholder(value string) string {
+	if strings.HasPrefix(value, "http://") {
+		return "http://***"
+	}
+	if strings.HasPrefix(value, "https://") {
+		return "https://***"
+	}
+	return "***"
+}
+
+// findPrefixPlaceholder checks known secret prefixes and returns the appropriate placeholder.
+func findPrefixPlaceholder(value string) string {
+	prefixes := []struct {
+		prefix      string
+		placeholder string
+	}{
+		{"sk_live_", "sk_***"},
+		{"sk_test_", "sk_***"},
+		{"ghp_", "ghp_***"},
+		{"gho_", "ghp_***"},
+		{"ghu_", "ghp_***"},
+		{"pk_test_", "pk_***"},
+		{"pk_live_", "pk_***"},
+		{"xoxb-", "xox***"},
+		{"xoxp-", "xox***"},
+		{"ya29.", "ya29.***"},
+		{"ssh-rsa", "ssh-***"},
+		{"ssh-ed25519", "ssh-***"},
+	}
+
+	for _, p := range prefixes {
+		if strings.HasPrefix(value, p.prefix) {
+			return p.placeholder
+		}
+	}
+	return ""
 }
 
 func isSecretKey(key string) bool {
