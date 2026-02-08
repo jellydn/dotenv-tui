@@ -28,9 +28,6 @@ func GenerateExample(entries []parser.Entry) []parser.Entry {
 
 		case parser.Comment, parser.BlankLine:
 			result = append(result, e)
-
-		default:
-			result = append(result, e)
 		}
 	}
 

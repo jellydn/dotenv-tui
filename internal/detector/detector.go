@@ -10,18 +10,18 @@ import (
 var hexPattern = regexp.MustCompile("^[0-9a-fA-F]+$")
 
 var (
-	secretPatternsMap = map[string]bool{
-		"SECRET": true, "TOKEN": true, "PASSWORD": true, "PASS": true,
-		"AUTH": true, "CREDENTIAL": true, "PRIVATE": true,
-		"API_KEY": true, "ACCESS_KEY": true,
+	secretPatterns = []string{
+		"SECRET", "TOKEN", "PASSWORD", "PASS",
+		"AUTH", "CREDENTIAL", "PRIVATE",
+		"API_KEY", "ACCESS_KEY",
 	}
-	commonNonSecretsMap = map[string]bool{
-		"PORT": true, "HOST": true, "NODE_ENV": true, "APP_NAME": true,
-		"DEBUG": true, "LOG_LEVEL": true,
-		"ENV": true, "ENVIRONMENT": true, "VERSION": true, "LANG": true,
-		"TIMEZONE": true, "REGION": true,
-		"ENDPOINT": true, "URL": true, "URI": true, "DOMAIN": true,
-		"SERVER": true, "CLUSTER": true,
+	commonNonSecrets = []string{
+		"PORT", "HOST", "NODE_ENV", "APP_NAME",
+		"DEBUG", "LOG_LEVEL",
+		"ENV", "ENVIRONMENT", "VERSION", "LANG",
+		"TIMEZONE", "REGION",
+		"ENDPOINT", "URL", "URI", "DOMAIN",
+		"SERVER", "CLUSTER",
 	}
 )
 
@@ -128,7 +128,7 @@ func findPrefixPlaceholder(value string) string {
 
 func isSecretKey(key string) bool {
 	keyUpper := strings.ToUpper(key)
-	for pattern := range secretPatternsMap {
+	for _, pattern := range secretPatterns {
 		if strings.Contains(keyUpper, pattern) {
 			return true
 		}
@@ -173,7 +173,13 @@ func isSecretValue(value string) bool {
 }
 
 func isCommonNonSecret(key string) bool {
-	return commonNonSecretsMap[strings.ToUpper(key)]
+	keyUpper := strings.ToUpper(key)
+	for _, pattern := range commonNonSecrets {
+		if keyUpper == pattern {
+			return true
+		}
+	}
+	return false
 }
 
 func isBase64(s string) bool {

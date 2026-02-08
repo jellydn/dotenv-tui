@@ -32,7 +32,6 @@ type FormModel struct {
 	filePath        string
 	confirmed       bool
 	errorMsg        string
-	successMsg      string
 	fileIndex       int
 	totalFiles      int
 }
@@ -222,7 +221,6 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scroll = 0
 		m.confirmed = false
 		m.errorMsg = ""
-		m.successMsg = ""
 
 		if len(m.fields) > 0 {
 			m.fields[0].Input.Focus()
@@ -232,12 +230,9 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case FormSavedMsg:
 		m.confirmed = true
 		if msg.Success {
-			outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
-			m.successMsg = fmt.Sprintf("Successfully wrote %s", outputPath)
 			m.errorMsg = ""
 		} else {
 			m.errorMsg = msg.Error
-			m.successMsg = ""
 		}
 		return m, nil
 
@@ -368,9 +363,10 @@ func (m FormModel) View() string {
 			Bold(true).
 			Render("Success!")
 
+		outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
 		message := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FAFAFA")).
-			Render(m.successMsg)
+			Render(fmt.Sprintf("Successfully wrote %s", outputPath))
 
 		help := lipgloss.NewStyle().
 			Faint(true).

@@ -231,12 +231,11 @@ func TestFormModelInit(t *testing.T) {
 func TestFormModelInitEmptyFields(t *testing.T) {
 	// Arrange
 	model := FormModel{
-		fields:     []FormField{},
-		cursor:     0,
-		filePath:   "/test/.env.example",
-		confirmed:  false,
-		errorMsg:   "",
-		successMsg: "",
+		fields:    []FormField{},
+		cursor:    0,
+		filePath:  "/test/.env.example",
+		confirmed: false,
+		errorMsg:  "",
 	}
 
 	// Act
