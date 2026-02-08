@@ -32,15 +32,22 @@ type FormModel struct {
 	filePath        string
 	confirmed       bool
 	errorMsg        string
-	successMsg      string
 	fileIndex       int
 	totalFiles      int
+	savedFiles      map[int]bool
+}
+
+// FormSavedMsg signals the form save operation has completed.
+type FormSavedMsg struct {
+	Success bool
+	Error   string
 }
 
 // FormFinishedMsg signals the form has completed with success status.
 type FormFinishedMsg struct {
 	Success bool
 	Error   string
+	Dir     int
 }
 
 type formInitMsg struct {
@@ -49,10 +56,11 @@ type formInitMsg struct {
 	filePath        string
 	fileIndex       int
 	totalFiles      int
+	savedFiles      map[int]bool
 }
 
 // NewFormModel creates a new form model for collecting environment variables.
-func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
+func NewFormModel(exampleFilePath string, fileIndex, totalFiles int, savedFiles map[int]bool) tea.Cmd {
 	return func() tea.Msg {
 		file, err := os.Open(exampleFilePath)
 		if err != nil {
@@ -61,6 +69,7 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 				fields:     []FormField{},
 				fileIndex:  fileIndex,
 				totalFiles: totalFiles,
+				savedFiles: savedFiles,
 			}
 		}
 		defer func() { _ = file.Close() }()
@@ -72,6 +81,7 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 				fields:     []FormField{},
 				fileIndex:  fileIndex,
 				totalFiles: totalFiles,
+				savedFiles: savedFiles,
 			}
 		}
 
@@ -108,6 +118,7 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 			filePath:        exampleFilePath,
 			fileIndex:       fileIndex,
 			totalFiles:      totalFiles,
+			savedFiles:      savedFiles,
 		}
 	}
 }
@@ -211,58 +222,62 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filePath = msg.filePath
 		m.fileIndex = msg.fileIndex
 		m.totalFiles = msg.totalFiles
+		m.savedFiles = msg.savedFiles
+		m.cursor = 0
+		m.scroll = 0
+		m.confirmed = false
+		m.errorMsg = ""
 
-		// Set focus on first field if there are any
 		if len(m.fields) > 0 {
 			m.fields[0].Input.Focus()
 		}
 		return m, nil
 
-	case FormFinishedMsg:
+	case FormSavedMsg:
 		m.confirmed = true
 		if msg.Success {
-			outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
-			m.successMsg = fmt.Sprintf("Successfully wrote %s", outputPath)
 			m.errorMsg = ""
 		} else {
 			m.errorMsg = msg.Error
-			m.successMsg = ""
 		}
 		return m, nil
 
 	case tea.KeyMsg:
 		if m.confirmed {
 			switch msg.String() {
-			case "q", "esc", "enter":
-				// Only emit done message after user views result
+			case "tab":
+				if m.totalFiles > 1 {
+					return m, func() tea.Msg {
+						return FormFinishedMsg{Success: m.errorMsg == "", Error: m.errorMsg, Dir: 1}
+					}
+				}
+			case "enter", "q", "esc":
 				return m, func() tea.Msg {
-					return FormFinishedMsg{Success: m.errorMsg == "", Error: m.errorMsg}
+					return FormFinishedMsg{Success: m.errorMsg == "", Error: m.errorMsg, Dir: 0}
 				}
 			}
 			return m, nil
 		}
 
 		switch msg.String() {
-		case "up", "k", "shift+tab":
+		case "up", "shift+tab":
 			m.moveCursorByDirection(directionUp)
-		case "down", "j", "tab":
+		case "down", "tab":
 			m.moveCursorByDirection(directionDown)
-		case "ctrl+s":
-			return m, m.saveForm()
 		case "enter":
 			if m.cursor == len(m.fields)-1 {
 				return m, m.saveForm()
 			}
 			m.moveCursorByDirection(directionDown)
-		case "q", "esc":
+		case "esc":
 			return m, func() tea.Msg {
-				return FormFinishedMsg{Success: false, Error: "cancelled"}
+				return FormFinishedMsg{Success: false, Error: "cancelled", Dir: 0}
 			}
 		}
 	}
 
 	// Update the currently focused field
-	if len(m.fields) > 0 {
+	if len(m.fields) > 0 && m.cursor >= 0 && m.cursor < len(m.fields) {
 		updatedInput, cmd := m.fields[m.cursor].Input.Update(msg)
 		m.fields[m.cursor].Input = updatedInput
 		return m, cmd
@@ -272,7 +287,7 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // saveForm processes the form fields and writes the resulting .env file.
-// It returns a command that emits a FormFinishedMsg upon completion.
+// It returns a command that emits a FormSavedMsg upon completion.
 func (m FormModel) saveForm() tea.Cmd {
 	return func() tea.Msg {
 		outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
@@ -299,21 +314,33 @@ func (m FormModel) saveForm() tea.Cmd {
 
 		file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
-			return FormFinishedMsg{Success: false, Error: fmt.Sprintf("Failed to create file: %v", err)}
+			return FormSavedMsg{Success: false, Error: fmt.Sprintf("Failed to create file: %v", err)}
 		}
 		defer func() { _ = file.Close() }()
 
 		if err := parser.Write(file, entries); err != nil {
-			return FormFinishedMsg{Success: false, Error: fmt.Sprintf("Failed to write file: %v", err)}
+			return FormSavedMsg{Success: false, Error: fmt.Sprintf("Failed to write file: %v", err)}
 		}
 
-		return FormFinishedMsg{Success: true}
+		return FormSavedMsg{Success: true}
 	}
 }
 
 // View renders the form UI.
 func (m FormModel) View() string {
 	if m.confirmed {
+		allDone := len(m.savedFiles) >= m.totalFiles
+		var helpText string
+		switch {
+		case allDone:
+			helpText = "All files saved! Enter: done"
+		case m.totalFiles > 1:
+			remaining := m.totalFiles - len(m.savedFiles)
+			helpText = fmt.Sprintf("Tab: next file • Enter: done (%d remaining)", remaining)
+		default:
+			helpText = "Enter: done"
+		}
+
 		if m.errorMsg != "" {
 			title := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#FF5F56")).
@@ -326,7 +353,7 @@ func (m FormModel) View() string {
 
 			help := lipgloss.NewStyle().
 				Faint(true).
-				Render("Press Enter or q to continue")
+				Render(helpText)
 
 			return fmt.Sprintf(
 				"\n%s\n\n%s\n\n%s\n",
@@ -341,13 +368,14 @@ func (m FormModel) View() string {
 			Bold(true).
 			Render("Success!")
 
+		outputPath := filepath.Join(filepath.Dir(m.filePath), ".env")
 		message := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FAFAFA")).
-			Render(m.successMsg)
+			Render(fmt.Sprintf("Successfully wrote %s", outputPath))
 
 		help := lipgloss.NewStyle().
 			Faint(true).
-			Render("Press Enter or q to continue")
+			Render(helpText)
 
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n",
@@ -362,7 +390,8 @@ func (m FormModel) View() string {
 		Bold(true).
 		Render("Edit Environment Variables")
 
-	positionText := fmt.Sprintf("[%d/%d] %s", m.fileIndex+1, m.totalFiles, m.filePath)
+	savedCount := len(m.savedFiles)
+	positionText := fmt.Sprintf("[%d/%d] %s  (%d/%d saved)", m.fileIndex+1, m.totalFiles, m.filePath, savedCount, m.totalFiles)
 	subtitle := lipgloss.NewStyle().
 		Faint(true).
 		Render(positionText)
@@ -415,7 +444,7 @@ func (m FormModel) View() string {
 
 	help := lipgloss.NewStyle().
 		Faint(true).
-		Render("↑/k: up • ↓/j: down • Tab: next • Shift+Tab: previous • Enter: submit • Ctrl+S: save • q/esc: cancel")
+		Render("↑: up • ↓: down • Tab: next • Shift+Tab: prev • Enter: next/submit • Esc: cancel")
 
 	return fmt.Sprintf(
 		"\n%s\n%s\n\n%s\n\n%s\n",

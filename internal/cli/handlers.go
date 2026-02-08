@@ -33,17 +33,17 @@ type DirScanner interface {
 // RealFileSystem is the default filesystem implementation.
 type RealFileSystem struct{}
 
-// Open opens a file for reading.
+// Open implements FileSystem.Open.
 func (RealFileSystem) Open(name string) (io.ReadCloser, error) {
 	return os.Open(name)
 }
 
-// Stat returns file information.
+// Stat implements FileSystem.Stat.
 func (RealFileSystem) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
 }
 
-// Create creates a file for writing.
+// Create implements FileSystem.Create.
 func (RealFileSystem) Create(name string) (io.WriteCloser, error) {
 	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 }
@@ -51,12 +51,12 @@ func (RealFileSystem) Create(name string) (io.WriteCloser, error) {
 // RealDirScanner is the default scanner implementation using the scanner package.
 type RealDirScanner struct{}
 
-// Scan recursively finds .env files.
+// Scan implements DirScanner.Scan.
 func (RealDirScanner) Scan(root string) ([]string, error) {
 	return scanner.Scan(root)
 }
 
-// ScanExamples finds .env.example files.
+// ScanExamples implements DirScanner.ScanExamples.
 func (RealDirScanner) ScanExamples(root string) ([]string, error) {
 	return scanner.ScanExamples(root)
 }
@@ -193,13 +193,11 @@ func ProcessExampleFile(exampleFile string, force bool, generated, skipped *int,
 	return nil
 }
 
-// fileExists checks if a file exists.
 func fileExists(fs FileSystem, path string) bool {
 	_, err := fs.Stat(path)
 	return err == nil
 }
 
-// confirmOverwrite asks the user to confirm overwriting an existing file.
 func confirmOverwrite(out io.Writer, path string, in io.Reader) (bool, error) {
 	_, _ = fmt.Fprintf(out, "%s already exists. Overwrite? [y/N] ", path)
 	reader := bufio.NewReader(in)
@@ -211,7 +209,6 @@ func confirmOverwrite(out io.Writer, path string, in io.Reader) (bool, error) {
 	return response == "y" || response == "Y", nil
 }
 
-// parseAndClose opens, parses, and closes a file.
 func parseAndClose(path string, fs FileSystem) ([]parser.Entry, error) {
 	file, err := fs.Open(path)
 	if err != nil {
@@ -227,7 +224,6 @@ func parseAndClose(path string, fs FileSystem) ([]parser.Entry, error) {
 	return entries, nil
 }
 
-// writeEntries creates a file and writes entries to it.
 func writeEntries(path string, fs FileSystem, entries []parser.Entry) error {
 	outFile, err := fs.Create(path)
 	if err != nil {

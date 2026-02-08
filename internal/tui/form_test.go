@@ -2,6 +2,11 @@ package tui
 
 import (
 	"testing"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/jellydn/dotenv-tui/internal/parser"
 )
 
 func TestIsPlaceholderValue(t *testing.T) {
@@ -231,12 +236,11 @@ func TestFormModelInit(t *testing.T) {
 func TestFormModelInitEmptyFields(t *testing.T) {
 	// Arrange
 	model := FormModel{
-		fields:     []FormField{},
-		cursor:     0,
-		filePath:   "/test/.env.example",
-		confirmed:  false,
-		errorMsg:   "",
-		successMsg: "",
+		fields:    []FormField{},
+		cursor:    0,
+		filePath:  "/test/.env.example",
+		confirmed: false,
+		errorMsg:  "",
 	}
 
 	// Act
@@ -246,4 +250,327 @@ func TestFormModelInitEmptyFields(t *testing.T) {
 	if cmd != nil {
 		t.Errorf("FormModel.Init() with empty fields should return nil, got %v", cmd)
 	}
+}
+
+func TestFormModelUpdateWithFormSavedMsg(t *testing.T) {
+	tests := []struct {
+		name            string
+		confirmedBefore bool
+		errorMsgBefore  string
+		success         bool
+		error           string
+		wantConfirmed   bool
+		wantErrorMsg    string
+	}{
+		{
+			name:            "successful save marks form as confirmed with no error",
+			confirmedBefore: false,
+			errorMsgBefore:  "",
+			success:         true,
+			error:           "",
+			wantConfirmed:   true,
+			wantErrorMsg:    "",
+		},
+		{
+			name:            "failed save marks form as confirmed with error message",
+			confirmedBefore: false,
+			errorMsgBefore:  "",
+			success:         false,
+			error:           "permission denied",
+			wantConfirmed:   true,
+			wantErrorMsg:    "permission denied",
+		},
+		{
+			name:            "error is cleared when subsequent save succeeds",
+			confirmedBefore: true,
+			errorMsgBefore:  "previous error",
+			success:         true,
+			error:           "",
+			wantConfirmed:   true,
+			wantErrorMsg:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			model := FormModel{
+				fields:    []FormField{{Key: "TEST"}},
+				cursor:    0,
+				confirmed: tt.confirmedBefore,
+				errorMsg:  tt.errorMsgBefore,
+			}
+
+			// Act
+			msg := FormSavedMsg{Success: tt.success, Error: tt.error}
+			newModel, cmd := model.Update(msg)
+
+			// Assert
+			newFormModel, ok := newModel.(FormModel)
+			if !ok {
+				t.Fatalf("Update() did not return FormModel")
+			}
+
+			if newFormModel.confirmed != tt.wantConfirmed {
+				t.Errorf("Update(FormSavedMsg) confirmed = %v, expected %v", newFormModel.confirmed, tt.wantConfirmed)
+			}
+
+			if newFormModel.errorMsg != tt.wantErrorMsg {
+				t.Errorf("Update(FormSavedMsg) errorMsg = %q, expected %q", newFormModel.errorMsg, tt.wantErrorMsg)
+			}
+
+			if cmd != nil {
+				t.Errorf("Update(FormSavedMsg) should not return command, got %v", cmd)
+			}
+		})
+	}
+}
+
+func TestFormModelNavigationAfterConfirmation(t *testing.T) {
+	tests := []struct {
+		name       string
+		totalFiles int
+		keyMsg     string
+		wantDir    int
+		wantCmd    bool
+	}{
+		{
+			name:       "tab key moves to next file when multiple files exist",
+			totalFiles: 3,
+			keyMsg:     "tab",
+			wantDir:    1,
+			wantCmd:    true,
+		},
+		{
+			name:       "tab key does nothing when only one file",
+			totalFiles: 1,
+			keyMsg:     "tab",
+			wantDir:    0,
+			wantCmd:    false,
+		},
+		{
+			name:       "enter key finishes with dir 0",
+			totalFiles: 3,
+			keyMsg:     "enter",
+			wantDir:    0,
+			wantCmd:    true,
+		},
+		{
+			name:       "q key finishes with dir 0",
+			totalFiles: 3,
+			keyMsg:     "q",
+			wantDir:    0,
+			wantCmd:    true,
+		},
+		{
+			name:       "esc key finishes with dir 0",
+			totalFiles: 3,
+			keyMsg:     "esc",
+			wantDir:    0,
+			wantCmd:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			model := FormModel{
+				fields:     []FormField{{Key: "TEST"}},
+				cursor:     0,
+				confirmed:  true,
+				totalFiles: tt.totalFiles,
+				savedFiles: make(map[int]bool),
+			}
+
+			// Act
+			msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.keyMsg)}
+			switch tt.keyMsg {
+			case "tab":
+				msg.Type = tea.KeyTab
+			case "enter":
+				msg.Type = tea.KeyEnter
+			case "esc":
+				msg.Type = tea.KeyEsc
+			}
+
+			newModel, cmd := model.Update(msg)
+
+			// Assert
+			_, ok := newModel.(FormModel)
+			if !ok {
+				t.Fatalf("Update() did not return FormModel")
+			}
+
+			if tt.wantCmd && cmd == nil {
+				t.Errorf("Update(%q) should return command, got nil", tt.keyMsg)
+			}
+
+			if !tt.wantCmd && cmd != nil {
+				t.Errorf("Update(%q) should not return command, got %v", tt.keyMsg, cmd)
+			}
+
+			if tt.wantCmd {
+				// Execute the command to get the message
+				msg := cmd()
+				finishedMsg, ok := msg.(FormFinishedMsg)
+				if !ok {
+					t.Fatalf("Command did not return FormFinishedMsg")
+				}
+
+				if finishedMsg.Dir != tt.wantDir {
+					t.Errorf("Update(%q) FormFinishedMsg.Dir = %d, expected %d", tt.keyMsg, finishedMsg.Dir, tt.wantDir)
+				}
+			}
+		})
+	}
+}
+
+func TestFormModelViewInitProgressDisplay(t *testing.T) {
+	tests := []struct {
+		name            string
+		fileIndex       int
+		totalFiles      int
+		savedFiles      map[int]bool
+		confirmed       bool
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name:       "single file shows no saved count",
+			fileIndex:  0,
+			totalFiles: 1,
+			savedFiles: map[int]bool{},
+			confirmed:  false,
+			wantContains: []string{
+				"[1/1]",
+				"(0/1 saved)",
+			},
+			wantNotContains: []string{},
+		},
+		{
+			name:       "multiple files shows saved progress",
+			fileIndex:  1,
+			totalFiles: 3,
+			savedFiles: map[int]bool{0: true},
+			confirmed:  false,
+			wantContains: []string{
+				"[2/3]",
+				"(1/3 saved)",
+			},
+			wantNotContains: []string{},
+		},
+		{
+			name:       "all files saved shows completion",
+			fileIndex:  2,
+			totalFiles: 3,
+			savedFiles: map[int]bool{0: true, 1: true, 2: true},
+			confirmed:  true,
+			wantContains: []string{
+				"All files saved!",
+			},
+			wantNotContains: []string{},
+		},
+		{
+			name:       "partial save shows remaining count",
+			fileIndex:  0,
+			totalFiles: 5,
+			savedFiles: map[int]bool{0: true, 2: true},
+			confirmed:  true,
+			wantContains: []string{
+				"(3 remaining)",
+			},
+			wantNotContains: []string{
+				"All files saved!",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			model := FormModel{
+				fields:     []FormField{{Key: "TEST", Input: textinput.New()}},
+				cursor:     0,
+				filePath:   "/test/.env.example",
+				fileIndex:  tt.fileIndex,
+				totalFiles: tt.totalFiles,
+				savedFiles: tt.savedFiles,
+				confirmed:  tt.confirmed,
+			}
+			model.fields[0].Input.Focus()
+
+			// Act
+			view := model.View()
+
+			// Assert
+			for _, substr := range tt.wantContains {
+				if !contains(view, substr) {
+					t.Errorf("View() should contain %q, got:\n%s", substr, view)
+				}
+			}
+
+			for _, substr := range tt.wantNotContains {
+				if contains(view, substr) {
+					t.Errorf("View() should not contain %q, got:\n%s", substr, view)
+				}
+			}
+		})
+	}
+}
+
+func TestFormModelInitWithSavedFiles(t *testing.T) {
+	// Arrange
+	input := textinput.New()
+	msg := formInitMsg{
+		fields:          []FormField{{Key: "TEST", Input: input}},
+		originalEntries: []parser.Entry{},
+		filePath:        "/test/.env.example",
+		fileIndex:       1,
+		totalFiles:      3,
+		savedFiles:      map[int]bool{0: true, 2: true},
+	}
+	model := FormModel{}
+
+	// Act
+	newModel, cmd := model.Update(msg)
+
+	// Assert
+	newFormModel, ok := newModel.(FormModel)
+	if !ok {
+		t.Fatalf("Update() did not return FormModel")
+	}
+
+	if newFormModel.fileIndex != 1 {
+		t.Errorf("Update(formInitMsg) fileIndex = %d, expected 1", newFormModel.fileIndex)
+	}
+
+	if newFormModel.totalFiles != 3 {
+		t.Errorf("Update(formInitMsg) totalFiles = %d, expected 3", newFormModel.totalFiles)
+	}
+
+	if len(newFormModel.savedFiles) != 2 {
+		t.Errorf("Update(formInitMsg) savedFiles length = %d, expected 2", len(newFormModel.savedFiles))
+	}
+
+	if !newFormModel.savedFiles[0] || !newFormModel.savedFiles[2] {
+		t.Errorf("Update(formInitMsg) savedFiles should contain 0 and 2, got %v", newFormModel.savedFiles)
+	}
+
+	if cmd != nil {
+		t.Errorf("Update(formInitMsg) should not return command, got %v", cmd)
+	}
+}
+
+// Helper function for string contains check
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
