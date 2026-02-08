@@ -94,6 +94,21 @@ func (m mockFileInfo) ModTime() time.Time { return time.Time{} }
 func (m mockFileInfo) IsDir() bool        { return false }
 func (m mockFileInfo) Sys() interface{}   { return nil }
 
+type mockDirScanner struct {
+	scanFiles    []string
+	scanErr      error
+	exampleFiles []string
+	exampleErr   error
+}
+
+func (m *mockDirScanner) Scan(_ string) ([]string, error) {
+	return m.scanFiles, m.scanErr
+}
+
+func (m *mockDirScanner) ScanExamples(_ string) ([]string, error) {
+	return m.exampleFiles, m.exampleErr
+}
+
 func TestGenerateExampleFile(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -232,19 +247,44 @@ func TestScanAndList(t *testing.T) {
 	tests := []struct {
 		name       string
 		dir        string
+		scanFiles  []string
+		scanErr    error
 		wantOutput string
+		wantErr    bool
 	}{
 		{
 			name:       "empty directory",
 			dir:        ".",
+			scanFiles:  nil,
 			wantOutput: "No .env files found",
+		},
+		{
+			name:       "found files",
+			dir:        ".",
+			scanFiles:  []string{".env", "sub/.env.local"},
+			wantOutput: "Found 2 .env file(s):",
+		},
+		{
+			name:    "scan error",
+			dir:     ".",
+			scanErr: fmt.Errorf("permission denied"),
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			sc := &mockDirScanner{scanFiles: tt.scanFiles, scanErr: tt.scanErr}
 			var out bytes.Buffer
-			err := ScanAndList(tt.dir, &out)
+			err := ScanAndList(tt.dir, sc, &out)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
+
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

@@ -300,7 +300,7 @@ func main() {
 		if len(args) > 0 {
 			scanPath = args[0]
 		}
-		if err := cli.ScanAndList(scanPath, os.Stdout); err != nil {
+		if err := cli.ScanAndList(scanPath, cli.RealDirScanner{}, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error scanning directory: %v\n", err)
 			os.Exit(1)
 		}
@@ -308,7 +308,7 @@ func main() {
 	}
 
 	if *yoloFlag {
-		if err := cli.GenerateAllEnvFiles(*forceFlag, cli.RealFileSystem{}, os.Stdin, os.Stdout); err != nil {
+		if err := cli.GenerateAllEnvFiles(*forceFlag, cli.RealFileSystem{}, cli.RealDirScanner{}, os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
