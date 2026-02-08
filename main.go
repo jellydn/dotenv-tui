@@ -8,7 +8,6 @@ import (
 	"runtime/debug"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/jellydn/dotenv-tui/internal/cli"
 	"github.com/jellydn/dotenv-tui/internal/tui"
@@ -52,7 +51,6 @@ const (
 	pickerScreen
 	previewScreen
 	formScreen
-	doneScreen
 )
 
 func initialModel() model {
@@ -80,8 +78,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return updatePreview(msg, m)
 	case formScreen:
 		return updateForm(msg, m)
-	case doneScreen:
-		return updateDone(msg, m)
 	}
 	return m, nil
 }
@@ -116,7 +112,7 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 			if msg.Mode == tui.GenerateExample {
 				m.currentScreen = previewScreen
-				return m, tui.NewPreviewModel(msg.Selected[0], 0, len(msg.Selected))
+				return m, tui.NewPreviewModel(msg.Selected)
 			}
 			if msg.Mode == tui.GenerateEnv {
 				m.currentScreen = formScreen
@@ -138,103 +134,40 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 func updatePreview(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	previewModel, previewCmd := m.preview.Update(msg)
 	m.preview = previewModel.(tui.PreviewModel)
-	cmd := previewCmd
 
-	switch msg := msg.(type) {
-	case tui.PreviewFinishedMsg:
-		m.currentScreen = doneScreen
-		return m, nil
-	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "esc" {
-			return returnToMenu(m), nil
-		}
+	if _, ok := msg.(tui.PreviewFinishedMsg); ok {
+		return returnToMenu(m), nil
 	}
 
-	return m, cmd
+	return m, previewCmd
 }
 
 func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	formModel, formCmd := m.form.Update(msg)
 	m.form = formModel.(tui.FormModel)
-	cmd := formCmd
 
 	switch msg := msg.(type) {
 	case tui.FormFinishedMsg:
-		m.currentScreen = doneScreen
-		return m, nil
+		if msg.Dir == 0 {
+			return returnToMenu(m), nil
+		}
+		n := len(m.fileList)
+		m.fileIndex = (m.fileIndex + msg.Dir + n) % n
+		m.currentScreen = formScreen
+		return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, n)
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "esc" {
 			return returnToMenu(m), nil
 		}
 	}
 
-	return m, cmd
-}
-
-// navigateToFile transitions to the appropriate screen (preview or form)
-// for the current file index in the file list.
-func (m model) navigateToFile() (tea.Model, tea.Cmd) {
-	if m.pickerMode == tui.GenerateExample {
-		m.currentScreen = previewScreen
-		return m, tui.NewPreviewModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
-	}
-	m.currentScreen = formScreen
-	return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, len(m.fileList))
+	return m, formCmd
 }
 
 func returnToMenu(m model) tea.Model {
 	m.currentScreen = menuScreen
 	m.menu = tui.NewMenuModel()
 	return m
-}
-
-// updateDone handles messages for the done/completion screen.
-// It supports Tab/Shift+Tab navigation between files.
-func updateDone(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		switch keyMsg.String() {
-		case "tab":
-			if len(m.fileList) > 1 {
-				m.fileIndex = (m.fileIndex + 1) % len(m.fileList)
-				return m.navigateToFile()
-			}
-		case "shift+tab":
-			if len(m.fileList) > 1 {
-				m.fileIndex = (m.fileIndex - 1 + len(m.fileList)) % len(m.fileList)
-				return m.navigateToFile()
-			}
-		case "q", "esc":
-			return returnToMenu(m), nil
-		}
-	}
-	return m, nil
-}
-
-func (m model) viewDone() string {
-	var title string
-	if m.pickerMode == tui.GenerateExample {
-		title = ".env.example Generation Complete"
-	} else {
-		title = ".env Generation Complete"
-	}
-
-	currentFile := ""
-	if len(m.fileList) > 0 {
-		currentFile = m.fileList[m.fileIndex]
-	}
-
-	status := fmt.Sprintf("Processed: %s [%d/%d]", currentFile, m.fileIndex+1, len(m.fileList))
-	help := "q: back to menu"
-	if len(m.fileList) > 1 {
-		help = "Tab: next file • Shift+Tab: previous file • q: back to menu"
-	}
-
-	return fmt.Sprintf(
-		"\n%s\n\n%s\n\n%s\n",
-		lipgloss.NewStyle().Bold(true).Render(title),
-		status,
-		lipgloss.NewStyle().Faint(true).Render(help),
-	)
 }
 
 func (m model) View() string {
@@ -247,8 +180,6 @@ func (m model) View() string {
 		return m.preview.View()
 	case formScreen:
 		return m.form.View()
-	case doneScreen:
-		return m.viewDone()
 	default:
 		return ""
 	}
