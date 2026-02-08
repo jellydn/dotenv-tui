@@ -42,6 +42,7 @@ type model struct {
 	fileIndex     int
 	pickerMode    tui.MenuChoice
 	windowHeight  int
+	savedFiles    map[int]bool
 }
 
 type screen int
@@ -109,6 +110,7 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 			m.fileList = msg.Selected
 			m.fileIndex = 0
 			m.pickerMode = msg.Mode
+			m.savedFiles = make(map[int]bool)
 
 			if msg.Mode == tui.GenerateExample {
 				m.currentScreen = previewScreen
@@ -116,7 +118,7 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 			}
 			if msg.Mode == tui.GenerateEnv {
 				m.currentScreen = formScreen
-				return m, tui.NewFormModel(msg.Selected[0], 0, len(msg.Selected))
+				return m, tui.NewFormModel(msg.Selected[0], 0, len(msg.Selected), m.savedFiles)
 			}
 		}
 		m.currentScreen = menuScreen
@@ -146,14 +148,37 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 	formModel, formCmd := m.form.Update(msg)
 	m.form = formModel.(tui.FormModel)
 
+	if savedMsg, ok := msg.(tui.FormSavedMsg); ok {
+		if savedMsg.Success {
+			m.savedFiles[m.fileIndex] = true
+		}
+	}
+
 	if finishedMsg, ok := msg.(tui.FormFinishedMsg); ok {
 		if finishedMsg.Dir == 0 {
 			return returnToMenu(m), nil
 		}
+
+		if len(m.savedFiles) >= len(m.fileList) {
+			return returnToMenu(m), nil
+		}
+
 		n := len(m.fileList)
-		m.fileIndex = (m.fileIndex + finishedMsg.Dir + n) % n
+		nextIndex := (m.fileIndex + finishedMsg.Dir + n) % n
+		for i := 0; i < n-1; i++ {
+			if !m.savedFiles[nextIndex] {
+				break
+			}
+			nextIndex = (nextIndex + finishedMsg.Dir + n) % n
+		}
+
+		if m.savedFiles[nextIndex] {
+			return returnToMenu(m), nil
+		}
+
+		m.fileIndex = nextIndex
 		m.currentScreen = formScreen
-		return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, n)
+		return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, n, m.savedFiles)
 	}
 
 	return m, formCmd

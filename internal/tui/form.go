@@ -34,6 +34,7 @@ type FormModel struct {
 	errorMsg        string
 	fileIndex       int
 	totalFiles      int
+	savedFiles      map[int]bool
 }
 
 // FormSavedMsg signals the form save operation has completed.
@@ -55,10 +56,11 @@ type formInitMsg struct {
 	filePath        string
 	fileIndex       int
 	totalFiles      int
+	savedFiles      map[int]bool
 }
 
 // NewFormModel creates a new form model for collecting environment variables.
-func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
+func NewFormModel(exampleFilePath string, fileIndex, totalFiles int, savedFiles map[int]bool) tea.Cmd {
 	return func() tea.Msg {
 		file, err := os.Open(exampleFilePath)
 		if err != nil {
@@ -67,6 +69,7 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 				fields:     []FormField{},
 				fileIndex:  fileIndex,
 				totalFiles: totalFiles,
+				savedFiles: savedFiles,
 			}
 		}
 		defer func() { _ = file.Close() }()
@@ -78,6 +81,7 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 				fields:     []FormField{},
 				fileIndex:  fileIndex,
 				totalFiles: totalFiles,
+				savedFiles: savedFiles,
 			}
 		}
 
@@ -114,6 +118,7 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int) tea.Cmd {
 			filePath:        exampleFilePath,
 			fileIndex:       fileIndex,
 			totalFiles:      totalFiles,
+			savedFiles:      savedFiles,
 		}
 	}
 }
@@ -217,6 +222,7 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filePath = msg.filePath
 		m.fileIndex = msg.fileIndex
 		m.totalFiles = msg.totalFiles
+		m.savedFiles = msg.savedFiles
 		m.cursor = 0
 		m.scroll = 0
 		m.confirmed = false
@@ -243,12 +249,6 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.totalFiles > 1 {
 					return m, func() tea.Msg {
 						return FormFinishedMsg{Success: m.errorMsg == "", Error: m.errorMsg, Dir: 1}
-					}
-				}
-			case "shift+tab":
-				if m.totalFiles > 1 {
-					return m, func() tea.Msg {
-						return FormFinishedMsg{Success: m.errorMsg == "", Error: m.errorMsg, Dir: -1}
 					}
 				}
 			case "enter", "q", "esc":
@@ -329,10 +329,15 @@ func (m FormModel) saveForm() tea.Cmd {
 // View renders the form UI.
 func (m FormModel) View() string {
 	if m.confirmed {
+		allDone := len(m.savedFiles) >= m.totalFiles
 		var helpText string
-		if m.totalFiles > 1 {
-			helpText = "Tab: next file • Shift+Tab: prev file • Enter: done"
-		} else {
+		switch {
+		case allDone:
+			helpText = "All files saved! Enter: done"
+		case m.totalFiles > 1:
+			remaining := m.totalFiles - len(m.savedFiles)
+			helpText = fmt.Sprintf("Tab: next file • Enter: done (%d remaining)", remaining)
+		default:
 			helpText = "Enter: done"
 		}
 
@@ -385,7 +390,8 @@ func (m FormModel) View() string {
 		Bold(true).
 		Render("Edit Environment Variables")
 
-	positionText := fmt.Sprintf("[%d/%d] %s", m.fileIndex+1, m.totalFiles, m.filePath)
+	savedCount := len(m.savedFiles)
+	positionText := fmt.Sprintf("[%d/%d] %s  (%d/%d saved)", m.fileIndex+1, m.totalFiles, m.filePath, savedCount, m.totalFiles)
 	subtitle := lipgloss.NewStyle().
 		Faint(true).
 		Render(positionText)
