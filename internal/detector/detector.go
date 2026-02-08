@@ -15,16 +15,6 @@ var (
 		"AUTH": true, "CREDENTIAL": true, "PRIVATE": true,
 		"API_KEY": true, "ACCESS_KEY": true,
 	}
-	knownSecretPrefixesMap = map[string]bool{
-		"sk_live_": true, "sk_test_": true, "rk_live_": true, "rk_test_": true,
-		"ghp_": true, "gho_": true, "ghu_": true, "ghs_": true, "github_pat_": true,
-		"pk_live_": true, "pk_test_": true,
-		"xoxb-": true, "xoxp-": true, "xoxa-": true,
-		"ya29.":  true,
-		"whsec_": true,
-		"akiai":  true, "akia": true,
-		"age-secret-key-": true,
-	}
 	commonNonSecretsMap = map[string]bool{
 		"PORT": true, "HOST": true, "NODE_ENV": true, "APP_NAME": true,
 		"DEBUG": true, "LOG_LEVEL": true,
@@ -34,6 +24,38 @@ var (
 		"SERVER": true, "CLUSTER": true,
 	}
 )
+
+// prefixPlaceholder defines a secret prefix and its placeholder format.
+type prefixPlaceholder struct {
+	prefix      string
+	placeholder string
+}
+
+// knownSecretPrefixes maps detection prefixes to their display placeholders.
+// Keep sorted alphabetically by prefix for consistency.
+var knownSecretPrefixes = []prefixPlaceholder{
+	{"age-secret-key-", "age-***"},
+	{"akiai", "akia***"},
+	{"akia", "akia***"},
+	{"gho_", "gho_***"},
+	{"ghp_", "ghp_***"},
+	{"ghs_", "ghs_***"},
+	{"ghu_", "ghu_***"},
+	{"github_pat_", "github_pat_***"},
+	{"pk_live_", "pk_***"},
+	{"pk_test_", "pk_***"},
+	{"rk_live_", "rk_***"},
+	{"rk_test_", "rk_***"},
+	{"sk_live_", "sk_***"},
+	{"sk_test_", "sk_***"},
+	{"ssh-ed25519", "ssh-ed25519-***"},
+	{"ssh-rsa", "ssh-rsa-***"},
+	{"whsec_", "whsec_***"},
+	{"xoxa-", "xox***"},
+	{"xoxb-", "xox***"},
+	{"xoxp-", "xox***"},
+	{"ya29.", "ya29.***"},
+}
 
 // IsSecret determines if a key-value pair appears to contain a secret
 func IsSecret(key string, value string) bool {
@@ -96,27 +118,9 @@ func generateUrlPlaceholder(value string) string {
 
 // findPrefixPlaceholder checks known secret prefixes and returns the appropriate placeholder.
 func findPrefixPlaceholder(value string) string {
-	prefixes := []struct {
-		prefix      string
-		placeholder string
-	}{
-		{"sk_live_", "sk_***"},
-		{"sk_test_", "sk_***"},
-		{"ghp_", "ghp_***"},
-		{"gho_", "ghp_***"},
-		{"ghu_", "ghp_***"},
-		{"pk_test_", "pk_***"},
-		{"pk_live_", "pk_***"},
-		{"xoxb-", "xox***"},
-		{"xoxp-", "xox***"},
-		{"ya29.", "ya29.***"},
-		{"ssh-rsa", "ssh-***"},
-		{"ssh-ed25519", "ssh-***"},
-	}
-
-	for _, p := range prefixes {
-		if strings.HasPrefix(value, p.prefix) {
-			return p.placeholder
+	for _, pp := range knownSecretPrefixes {
+		if strings.HasPrefix(value, pp.prefix) {
+			return pp.placeholder
 		}
 	}
 	return ""
@@ -149,8 +153,8 @@ func isSecretValue(value string) bool {
 
 	// Known secret prefixes
 	lowerValue := strings.ToLower(value)
-	for prefix := range knownSecretPrefixesMap {
-		if strings.HasPrefix(lowerValue, prefix) {
+	for _, pp := range knownSecretPrefixes {
+		if strings.HasPrefix(lowerValue, pp.prefix) {
 			return true
 		}
 	}

@@ -62,7 +62,7 @@ func TestGenerateExample(t *testing.T) {
 			},
 			expected: []parser.Entry{
 				parser.KeyValue{Key: "API_KEY", Value: "ghp_***", Quoted: ""},
-				parser.KeyValue{Key: "WEBHOOK_SECRET", Value: "***", Quoted: ""},
+				parser.KeyValue{Key: "WEBHOOK_SECRET", Value: "whsec_***", Quoted: ""},
 			},
 		},
 		{
