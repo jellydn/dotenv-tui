@@ -36,6 +36,7 @@ type FormModel struct {
 	fileIndex       int
 	totalFiles      int
 	savedFiles      map[int]bool
+	enableBackup    bool
 }
 
 // FormSavedMsg signals the form save operation has completed.
@@ -58,19 +59,21 @@ type formInitMsg struct {
 	fileIndex       int
 	totalFiles      int
 	savedFiles      map[int]bool
+	enableBackup    bool
 }
 
 // NewFormModel creates a new form model for collecting environment variables.
-func NewFormModel(exampleFilePath string, fileIndex, totalFiles int, savedFiles map[int]bool) tea.Cmd {
+func NewFormModel(exampleFilePath string, fileIndex, totalFiles int, savedFiles map[int]bool, enableBackup bool) tea.Cmd {
 	return func() tea.Msg {
 		file, err := os.Open(exampleFilePath)
 		if err != nil {
 			return formInitMsg{
-				filePath:   exampleFilePath,
-				fields:     []FormField{},
-				fileIndex:  fileIndex,
-				totalFiles: totalFiles,
-				savedFiles: savedFiles,
+				filePath:     exampleFilePath,
+				fields:       []FormField{},
+				fileIndex:    fileIndex,
+				totalFiles:   totalFiles,
+				savedFiles:   savedFiles,
+				enableBackup: enableBackup,
 			}
 		}
 		defer func() { _ = file.Close() }()
@@ -78,11 +81,12 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int, savedFiles 
 		entries, err := parser.Parse(file)
 		if err != nil {
 			return formInitMsg{
-				filePath:   exampleFilePath,
-				fields:     []FormField{},
-				fileIndex:  fileIndex,
-				totalFiles: totalFiles,
-				savedFiles: savedFiles,
+				filePath:     exampleFilePath,
+				fields:       []FormField{},
+				fileIndex:    fileIndex,
+				totalFiles:   totalFiles,
+				savedFiles:   savedFiles,
+				enableBackup: enableBackup,
 			}
 		}
 
@@ -120,6 +124,7 @@ func NewFormModel(exampleFilePath string, fileIndex, totalFiles int, savedFiles 
 			fileIndex:       fileIndex,
 			totalFiles:      totalFiles,
 			savedFiles:      savedFiles,
+			enableBackup:    enableBackup,
 		}
 	}
 }
@@ -224,6 +229,7 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.fileIndex = msg.fileIndex
 		m.totalFiles = msg.totalFiles
 		m.savedFiles = msg.savedFiles
+		m.enableBackup = msg.enableBackup
 		m.cursor = 0
 		m.scroll = 0
 		m.confirmed = false
@@ -313,9 +319,12 @@ func (m FormModel) saveForm() tea.Cmd {
 			}
 		}
 
-		// Create backup before overwriting (TUI always creates backups by default)
-		if _, err := backup.CreateBackup(outputPath); err != nil {
-			return FormSavedMsg{Success: false, Error: fmt.Sprintf("Failed to create backup: %v", err)}
+		if m.enableBackup {
+			if _, err := os.Stat(outputPath); err == nil {
+				if _, err := backup.CreateBackup(outputPath); err != nil {
+					return FormSavedMsg{Success: false, Error: fmt.Sprintf("Failed to create backup: %v", err)}
+				}
+			}
 		}
 
 		file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)

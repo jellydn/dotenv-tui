@@ -43,6 +43,7 @@ type model struct {
 	pickerMode    tui.MenuChoice
 	windowHeight  int
 	savedFiles    map[int]bool
+	enableBackup  bool
 }
 
 type screen int
@@ -58,6 +59,7 @@ func initialModel() model {
 	return model{
 		currentScreen: menuScreen,
 		menu:          tui.NewMenuModel(),
+		enableBackup:  true,
 	}
 }
 
@@ -115,11 +117,11 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 			if msg.Mode == tui.GenerateExample {
 				m.currentScreen = previewScreen
 				m.preview.SetWindowHeight(m.windowHeight)
-				return m, tui.NewPreviewModel(msg.Selected)
+				return m, tui.NewPreviewModel(msg.Selected, m.menu.EnableBackup())
 			}
 			if msg.Mode == tui.GenerateEnv {
 				m.currentScreen = formScreen
-				return m, tui.NewFormModel(msg.Selected[0], 0, len(msg.Selected), m.savedFiles)
+				return m, tui.NewFormModel(msg.Selected[0], 0, len(msg.Selected), m.savedFiles, m.menu.EnableBackup())
 			}
 		}
 		m.currentScreen = menuScreen
@@ -179,7 +181,7 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 		m.fileIndex = nextIndex
 		m.currentScreen = formScreen
-		return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, n, m.savedFiles)
+		return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, n, m.savedFiles, m.menu.EnableBackup())
 	}
 
 	return m, formCmd

@@ -83,14 +83,23 @@ func GenerateFile(inputPath string, force bool, createBackup bool, outputFilenam
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
 	}
 
-	// Create backup if file exists and backups are enabled
 	if createBackup {
-		backupPath, err := backup.CreateBackupWithFS(outputPath, fs)
-		if err != nil {
-			return fmt.Errorf("failed to create backup: %w", err)
-		}
-		if backupPath != "" {
-			_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
+		if outputPath == inputPath {
+			backupPath, err := backup.CreateBackupWithFS(inputPath, fs)
+			if err != nil {
+				return fmt.Errorf("failed to create backup: %w", err)
+			}
+			if backupPath != "" {
+				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
+			}
+		} else {
+			backupPath, err := backup.CreateBackupWithFS(outputPath, fs)
+			if err != nil {
+				return fmt.Errorf("failed to create backup: %w", err)
+			}
+			if backupPath != "" {
+				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
+			}
 		}
 	}
 

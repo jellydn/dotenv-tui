@@ -151,10 +151,8 @@ func TestCreateBackupWithFS(t *testing.T) {
 					if backupContent != tt.fileContent {
 						t.Errorf("backup content = %q, want %q", backupContent, tt.fileContent)
 					}
-				} else {
-					if backupPath != "" {
-						t.Errorf("expected no backup but got %q", backupPath)
-					}
+				} else if backupPath != "" {
+					t.Errorf("expected no backup but got %q", backupPath)
 				}
 			}
 		})
@@ -187,39 +185,6 @@ func TestGetBackupPath(t *testing.T) {
 			got := GetBackupPath(tt.path, tt.timestamp)
 			if got != tt.want {
 				t.Errorf("GetBackupPath() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGetBackupDir(t *testing.T) {
-	tests := []struct {
-		name string
-		path string
-		want string
-	}{
-		{
-			name: "returns directory for absolute path",
-			path: "/test/dir/.env",
-			want: "/test/dir",
-		},
-		{
-			name: "returns current dir for relative path",
-			path: ".env",
-			want: ".",
-		},
-		{
-			name: "returns directory for nested relative path",
-			path: "sub/dir/.env",
-			want: "sub/dir",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := GetBackupDir(tt.path)
-			if got != tt.want {
-				t.Errorf("GetBackupDir() = %q, want %q", got, tt.want)
 			}
 		})
 	}

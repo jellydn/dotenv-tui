@@ -8,11 +8,11 @@ import (
 
 func TestGenerateExampleFileWithBackup(t *testing.T) {
 	tests := []struct {
-		name             string
-		inputContent     string
-		existingOutput   string
-		createBackup     bool
-		force            bool
+		name              string
+		inputContent      string
+		existingOutput    string
+		createBackup      bool
+		force             bool
 		wantBackupCreated bool
 	}{
 		{

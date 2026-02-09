@@ -18,19 +18,26 @@ const (
 
 // MenuModel is the Bubble Tea model for the main menu.
 type MenuModel struct {
-	choice MenuChoice
+	choice       MenuChoice
+	enableBackup bool
 }
 
 // NewMenuModel creates a new menu model with default selection.
 func NewMenuModel() MenuModel {
 	return MenuModel{
-		choice: GenerateExample,
+		choice:       GenerateExample,
+		enableBackup: true,
 	}
 }
 
 // Choice returns the current menu choice.
 func (m MenuModel) Choice() MenuChoice {
 	return m.choice
+}
+
+// EnableBackup returns whether backups are enabled.
+func (m MenuModel) EnableBackup() bool {
+	return m.enableBackup
 }
 
 // Init initializes the menu model.
@@ -51,6 +58,8 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.choice < GenerateEnv {
 				m.choice++
 			}
+		case "b":
+			m.enableBackup = !m.enableBackup
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter", " ":
@@ -86,9 +95,20 @@ func (m MenuModel) View() string {
 		}
 	}
 
+	var backupStatus string
+	if m.enableBackup {
+		backupStatus = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00FF00")).
+			Render("[B] Backup: ON")
+	} else {
+		backupStatus = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF5F56")).
+			Render("[B] Backup: OFF")
+	}
+
 	help := lipgloss.NewStyle().
 		Faint(true).
-		Render("↑/k: up • ↓/j: down • Enter: select • q: quit")
+		Render("↑/k: up • ↓/j: down • b: toggle backup • Enter: select • q: quit")
 
-	return "\n" + header + "\n\n" + renderedChoices + "\n" + help + "\n"
+	return "\n" + header + "\n\n" + renderedChoices + "\n" + backupStatus + "\n\n" + help + "\n"
 }
