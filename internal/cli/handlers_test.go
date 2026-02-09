@@ -471,14 +471,14 @@ func TestDryRunGenerateExampleFile(t *testing.T) {
 			inputContent:   "API_KEY=secret123\nPORT=3000\n",
 			existingOutput: false,
 			wantErr:        false,
-			wantInOutput:   []string{"DRY RUN PREVIEW", ".env.example", "CREATE new file", "API_KEY=***", "PORT=3000"},
+			wantInOutput:   []string{"DRY RUN PREVIEW", ".env.example", "Would CREATE new file", "API_KEY=***", "PORT=3000"},
 		},
 		{
 			name:           "dry-run preview for overwrite",
 			inputContent:   "API_KEY=secret123\n",
 			existingOutput: true,
 			wantErr:        false,
-			wantInOutput:   []string{"DRY RUN PREVIEW", ".env.example", "OVERWRITE existing file", "API_KEY=***"},
+			wantInOutput:   []string{"DRY RUN PREVIEW", ".env.example", "Would OVERWRITE existing file", "API_KEY=***"},
 		},
 	}
 
@@ -533,14 +533,14 @@ func TestDryRunGenerateEnvFile(t *testing.T) {
 			inputContent:   "API_KEY=***\nPORT=3000\n",
 			existingOutput: false,
 			wantErr:        false,
-			wantInOutput:   []string{"DRY RUN PREVIEW", ".env", "CREATE new file", "API_KEY=***", "PORT=3000"},
+			wantInOutput:   []string{"DRY RUN PREVIEW", ".env", "Would CREATE new file", "API_KEY=***", "PORT=3000"},
 		},
 		{
 			name:           "dry-run preview for overwrite env file",
 			inputContent:   "DATABASE_URL=***\n",
 			existingOutput: true,
 			wantErr:        false,
-			wantInOutput:   []string{"DRY RUN PREVIEW", ".env", "OVERWRITE existing file", "DATABASE_URL=***"},
+			wantInOutput:   []string{"DRY RUN PREVIEW", ".env", "Would OVERWRITE existing file", "DATABASE_URL=***"},
 		},
 	}
 

@@ -85,7 +85,7 @@ func GenerateFile(inputPath string, force bool, createBackup bool, dryRun bool, 
 
 	outputPath := filepath.Join(filepath.Dir(inputPath), outputFilename)
 
-	// Check if file exists (only error out if not dry-run and not force)
+	// Error if file exists without --force flag (unless in dry-run mode)
 	if _, err := fs.Stat(outputPath); err == nil && !force && !dryRun {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
 	}
