@@ -69,7 +69,7 @@ func (RealDirScanner) ScanExamples(root string) ([]string, error) {
 }
 
 // GenerateFile generates a file from an input file, processing entries with the provided function.
-func GenerateFile(inputPath string, force bool, createBackup bool, outputFilename string, processEntries EntryProcessor, parseErrMsg string, fs FileSystem, out io.Writer) error {
+func GenerateFile(inputPath string, force bool, createBackup bool, dryRun bool, outputFilename string, processEntries EntryProcessor, parseErrMsg string, fs FileSystem, out io.Writer) error {
 	file, err := fs.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to open input file: %w", err)
@@ -85,8 +85,14 @@ func GenerateFile(inputPath string, force bool, createBackup bool, outputFilenam
 
 	outputPath := filepath.Join(filepath.Dir(inputPath), outputFilename)
 
-	if _, err := fs.Stat(outputPath); err == nil && !force {
+	// Check if file exists (only error out if not dry-run and not force)
+	if _, err := fs.Stat(outputPath); err == nil && !force && !dryRun {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
+	}
+
+	// Dry-run mode: preview the output without writing
+	if dryRun {
+		return previewOutput(outputPath, processedEntries, fs, out)
 	}
 
 	if createBackup {
@@ -128,13 +134,13 @@ func GenerateFile(inputPath string, force bool, createBackup bool, outputFilenam
 }
 
 // GenerateExampleFile generates a .env.example file from a .env file.
-func GenerateExampleFile(inputPath string, force bool, createBackup bool, fs FileSystem, out io.Writer) error {
-	return GenerateFile(inputPath, force, createBackup, ".env.example", generator.GenerateExample, ".env file", fs, out)
+func GenerateExampleFile(inputPath string, force bool, createBackup bool, dryRun bool, fs FileSystem, out io.Writer) error {
+	return GenerateFile(inputPath, force, createBackup, dryRun, ".env.example", generator.GenerateExample, ".env file", fs, out)
 }
 
 // GenerateEnvFile generates a .env file from a .env.example file.
-func GenerateEnvFile(inputPath string, force bool, createBackup bool, fs FileSystem, out io.Writer) error {
-	return GenerateFile(inputPath, force, createBackup, ".env", func(entries []parser.Entry) []parser.Entry {
+func GenerateEnvFile(inputPath string, force bool, createBackup bool, dryRun bool, fs FileSystem, out io.Writer) error {
+	return GenerateFile(inputPath, force, createBackup, dryRun, ".env", func(entries []parser.Entry) []parser.Entry {
 		return entries
 	}, ".env.example file", fs, out)
 }
@@ -164,7 +170,7 @@ func ScanAndList(dir string, sc DirScanner, out io.Writer) error {
 }
 
 // GenerateAllEnvFiles generates .env files from all .env.example files.
-func GenerateAllEnvFiles(force bool, createBackup bool, fs FileSystem, sc DirScanner, in io.Reader, out io.Writer) error {
+func GenerateAllEnvFiles(force bool, createBackup bool, dryRun bool, fs FileSystem, sc DirScanner, in io.Reader, out io.Writer) error {
 	exampleFiles, err := sc.ScanExamples(".")
 	if err != nil {
 		return fmt.Errorf("failed to scan for .env.example files: %w", err)
@@ -177,6 +183,22 @@ func GenerateAllEnvFiles(force bool, createBackup bool, fs FileSystem, sc DirSca
 	_, _ = fmt.Fprintf(out, "Found %d .env.example file(s):\n", len(exampleFiles))
 	for _, file := range exampleFiles {
 		_, _ = fmt.Fprintf(out, "  %s\n", file)
+	}
+
+	// Dry-run mode: preview all files that would be generated
+	if dryRun {
+		_, _ = fmt.Fprintln(out, "\n[DRY RUN MODE - No files will be written]")
+		for _, exampleFile := range exampleFiles {
+			outputPath := strings.TrimSuffix(exampleFile, ".example")
+			entries, err := parseAndClose(exampleFile, fs)
+			if err != nil {
+				return err
+			}
+			if err := previewOutput(outputPath, entries, fs, out); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	var generated, skipped int
@@ -277,6 +299,50 @@ func writeEntries(path string, fs FileSystem, entries []parser.Entry) error {
 		return fmt.Errorf("failed to close %s: %w", path, err)
 	}
 
+	return nil
+}
+
+// previewOutput displays what would be written without actually writing the file.
+func previewOutput(outputPath string, entries []parser.Entry, fs FileSystem, out io.Writer) error {
+	// Check if file exists
+	fileExists := false
+	if _, err := fs.Stat(outputPath); err == nil {
+		fileExists = true
+	}
+
+	// Print header
+	_, _ = fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "=== DRY RUN PREVIEW ===")
+	_, _ = fmt.Fprintf(out, "File: %s\n", outputPath)
+	if fileExists {
+		_, _ = fmt.Fprintln(out, "Status: Would OVERWRITE existing file")
+	} else {
+		_, _ = fmt.Fprintln(out, "Status: Would CREATE new file")
+	}
+	_, _ = fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "Content preview:")
+	_, _ = fmt.Fprintln(out, "---")
+
+	// Write entries to a buffer to preview
+	var buf strings.Builder
+	if err := parser.Write(&nopWriteCloser{Writer: &buf}, entries); err != nil {
+		return fmt.Errorf("failed to generate preview: %w", err)
+	}
+
+	// Print the content
+	_, _ = fmt.Fprint(out, buf.String())
+	_, _ = fmt.Fprintln(out, "---")
+	_, _ = fmt.Fprintln(out, "")
+
+	return nil
+}
+
+// nopWriteCloser wraps an io.Writer and adds a no-op Close method.
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (nopWriteCloser) Close() error {
 	return nil
 }
 

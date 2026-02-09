@@ -216,6 +216,7 @@ func main() {
 		yoloFlag        = flag.Bool("yolo", false, "Auto-generate .env from all .env.example files")
 		forceFlag       = flag.Bool("force", false, "Force overwrite existing files")
 		noBackupFlag    = flag.Bool("no-backup", false, "Skip creating backup files")
+		dryRunFlag      = flag.Bool("dry-run", false, "Preview operations without writing files")
 		upgradeFlag     = flag.Bool("upgrade", false, "Upgrade to the latest version")
 	)
 
@@ -232,7 +233,7 @@ func main() {
 	}
 
 	if *generateExample != "" {
-		if err := cli.GenerateExampleFile(*generateExample, *forceFlag, !*noBackupFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
+		if err := cli.GenerateExampleFile(*generateExample, *forceFlag, !*noBackupFlag, *dryRunFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating .env.example: %v\n", err)
 			os.Exit(1)
 		}
@@ -240,7 +241,7 @@ func main() {
 	}
 
 	if *generateEnv != "" {
-		if err := cli.GenerateEnvFile(*generateEnv, *forceFlag, !*noBackupFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
+		if err := cli.GenerateEnvFile(*generateEnv, *forceFlag, !*noBackupFlag, *dryRunFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating .env: %v\n", err)
 			os.Exit(1)
 		}
@@ -261,7 +262,7 @@ func main() {
 	}
 
 	if *yoloFlag {
-		if err := cli.GenerateAllEnvFiles(*forceFlag, !*noBackupFlag, cli.RealFileSystem{}, cli.RealDirScanner{}, os.Stdin, os.Stdout); err != nil {
+		if err := cli.GenerateAllEnvFiles(*forceFlag, !*noBackupFlag, *dryRunFlag, cli.RealFileSystem{}, cli.RealDirScanner{}, os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
