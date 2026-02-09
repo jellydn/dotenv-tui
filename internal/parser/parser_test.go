@@ -375,11 +375,11 @@ with single quotes'
 }
 
 func TestParseMultilineTestdata(t *testing.T) {
-file, err := os.Open("../../testdata/.env.multiline")
-if err != nil {
-t.Skipf("Skipping test: testdata file not found: %v", err)
-}
-defer file.Close()
+	file, err := os.Open("../../testdata/.env.multiline")
+	if err != nil {
+		t.Skipf("Skipping test: testdata file not found: %v", err)
+	}
+	defer file.Close()
 
 entries, err := Parse(file)
 if err != nil {
