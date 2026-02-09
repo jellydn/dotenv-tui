@@ -20,6 +20,8 @@ dotenv-tui fixes this with two commands:
 
 2. **`.env.example` → `.env`** — Interactive form pre-filled with example values. Just tab through, fill in your secrets, and you're set up.
 
+<img width="2356" height="1302" alt="dotenv-tui --help" src="https://github.com/user-attachments/assets/08ef2729-3452-4d60-b0f8-59ce73ee88ee" />
+
 ## Features
 
 - Smart secret detection by key name patterns and value shape
