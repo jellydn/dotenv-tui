@@ -34,8 +34,34 @@ func Parse(reader io.Reader) ([]Entry, error) {
 	// Increase buffer to 1MB to handle large values
 	scanner.Buffer(make([]byte, 1024), 1024*1024)
 
+	var accumulated string
+	var inQuote rune // 0 if not in quote, '"' or '\'' if inside quote
+
 	for scanner.Scan() {
 		line := scanner.Text()
+
+		// If we're accumulating a multiline value
+		if inQuote != 0 {
+			accumulated += "\n" + line
+			// Check if this line closes the quote
+			if strings.ContainsRune(line, inQuote) {
+				// Find the closing quote (it should be the last occurrence)
+				idx := strings.LastIndexByte(line, byte(inQuote))
+				if idx != -1 {
+					// Quote is closed, process the accumulated value
+					inQuote = 0
+					kv, err := parseKeyValue(accumulated)
+					if err != nil {
+						return nil, fmt.Errorf("error parsing multiline value %q: %w", accumulated, err)
+					}
+					entries = append(entries, kv)
+					accumulated = ""
+				}
+			}
+			continue
+		}
+
+		// Not in a multiline value, process line normally
 		line = strings.TrimRight(line, " \t\r\n")
 
 		if line == "" {
@@ -49,6 +75,16 @@ func Parse(reader io.Reader) ([]Entry, error) {
 		}
 
 		if strings.Contains(line, "=") {
+			// Check if this line starts a multiline quoted value
+			quoteStart := findUnclosedQuote(line)
+			if quoteStart != 0 {
+				// Start accumulating multiline value
+				inQuote = quoteStart
+				accumulated = line
+				continue
+			}
+
+			// Single-line key-value
 			kv, err := parseKeyValue(line)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing line %q: %w", line, err)
@@ -64,7 +100,69 @@ func Parse(reader io.Reader) ([]Entry, error) {
 		return nil, fmt.Errorf("error reading: %w", err)
 	}
 
+	// Check if we ended with an unclosed quote
+	if inQuote != 0 {
+		return nil, fmt.Errorf("unclosed quote in multiline value")
+	}
+
 	return entries, nil
+}
+
+// findUnclosedQuote checks if a line contains an opening quote without a matching closing quote
+// Returns the quote character ('"' or '\”) if unclosed, or 0 if closed or no quotes
+func findUnclosedQuote(line string) rune {
+	// Find the equals sign first
+	eqIdx := strings.IndexByte(line, '=')
+	if eqIdx == -1 {
+		return 0
+	}
+
+	// Check the value part (after =)
+	valuePart := line[eqIdx+1:]
+
+	// Check for double quote
+	if strings.HasPrefix(valuePart, "\"") {
+		// Count unescaped quotes
+		count := 0
+		escaped := false
+		for _, ch := range valuePart {
+			if ch == '\\' && !escaped {
+				escaped = true
+				continue
+			}
+			if ch == '"' && !escaped {
+				count++
+			}
+			escaped = false
+		}
+		// If odd number of quotes, it's unclosed
+		if count%2 == 1 {
+			return '"'
+		}
+	}
+
+	// Check for single quote
+	if strings.HasPrefix(valuePart, "'") {
+		// Count unescaped quotes
+		count := 0
+		escaped := false
+		for _, ch := range valuePart {
+			if ch == '\\' && !escaped {
+				escaped = true
+				continue
+			}
+			if ch == '\'' && !escaped {
+				count++
+			}
+			escaped = false
+		}
+		// If odd number of quotes, it's unclosed
+		if count%2 == 1 {
+			return '\''
+		}
+	}
+
+	return 0
 }
 
 // parseKeyValue parses a single key-value line
