@@ -299,6 +299,16 @@ line3"
 				KeyValue{Key: "KEY", Value: "line1\n\nline3", Quoted: "\"", Exported: false},
 			},
 		},
+		{
+			name: "multiline with escaped quotes",
+			input: `KEY="line1
+line2 has a \"quoted\" word
+line3"
+`,
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "line1\nline2 has a \\\"quoted\\\" word\nline3", Quoted: "\"", Exported: false},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -379,48 +389,52 @@ func TestParseMultilineTestdata(t *testing.T) {
 	if err != nil {
 		t.Skipf("Skipping test: testdata file not found: %v", err)
 	}
-	defer file.Close()
+	t.Cleanup(func() {
+		if closeErr := file.Close(); closeErr != nil {
+			t.Fatalf("Close() error = %v", closeErr)
+		}
+	})
 
-entries, err := Parse(file)
-if err != nil {
-t.Fatalf("Parse() error = %v", err)
-}
+	entries, err := Parse(file)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
 
-// Count entries by type
-var kvCount, commentCount, blankCount int
-for _, entry := range entries {
-switch entry.(type) {
-case KeyValue:
-kvCount++
-case Comment:
-commentCount++
-case BlankLine:
-blankCount++
-}
-}
+	// Count entries by type
+	var kvCount, commentCount, blankCount int
+	for _, entry := range entries {
+		switch entry.(type) {
+		case KeyValue:
+			kvCount++
+		case Comment:
+			commentCount++
+		case BlankLine:
+			blankCount++
+		}
+	}
 
-t.Logf("Parsed .env.multiline: %d key-values, %d comments, %d blank lines",
-kvCount, commentCount, blankCount)
+	t.Logf("Parsed .env.multiline: %d key-values, %d comments, %d blank lines",
+		kvCount, commentCount, blankCount)
 
-// Verify we have expected counts (at least)
-if kvCount < 9 {
-t.Errorf("Expected at least 9 key-value entries, got %d", kvCount)
-}
+	// Verify we have expected counts (at least)
+	if kvCount < 9 {
+		t.Errorf("Expected at least 9 key-value entries, got %d", kvCount)
+	}
 
-// Test round-trip
-var builder strings.Builder
-err = Write(&builder, entries)
-if err != nil {
-t.Fatalf("Write() error = %v", err)
-}
+	// Test round-trip
+	var builder strings.Builder
+	err = Write(&builder, entries)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
 
-// Parse the written output again
-reEntries, err := Parse(strings.NewReader(builder.String()))
-if err != nil {
-t.Fatalf("Parse() of written output error = %v", err)
-}
+	// Parse the written output again
+	reEntries, err := Parse(strings.NewReader(builder.String()))
+	if err != nil {
+		t.Fatalf("Parse() of written output error = %v", err)
+	}
 
-if len(reEntries) != len(entries) {
-t.Errorf("Round-trip changed number of entries: %d -> %d", len(entries), len(reEntries))
-}
+	if len(reEntries) != len(entries) {
+		t.Errorf("Round-trip changed number of entries: %d -> %d", len(entries), len(reEntries))
+	}
 }
