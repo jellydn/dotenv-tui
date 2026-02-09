@@ -2,9 +2,51 @@ package parser
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+// compareEntries compares two entry slices and reports differences.
+func compareEntries(t *testing.T, got, want []Entry) {
+	t.Helper()
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d entries, expected %d", len(got), len(want))
+	}
+
+	for i := range got {
+		gotEntry, wantEntry := got[i], want[i]
+
+		switch g := gotEntry.(type) {
+		case KeyValue:
+			w, ok := wantEntry.(KeyValue)
+			if !ok {
+				t.Errorf("entry %d is KeyValue, expected %T", i, wantEntry)
+				continue
+			}
+			if g.Key != w.Key || g.Value != w.Value || g.Quoted != w.Quoted || g.Exported != w.Exported {
+				t.Errorf("entry %d: got %+v, want %+v", i, g, w)
+			}
+
+		case Comment:
+			w, ok := wantEntry.(Comment)
+			if !ok {
+				t.Errorf("entry %d is Comment, expected %T", i, wantEntry)
+				continue
+			}
+			if g.Text != w.Text {
+				t.Errorf("entry %d: got %q, want %q", i, g.Text, w.Text)
+			}
+
+		case BlankLine:
+			if _, ok := wantEntry.(BlankLine); !ok {
+				t.Errorf("entry %d is BlankLine, expected %T", i, wantEntry)
+			}
+		}
+	}
+}
 
 func TestParse(t *testing.T) {
 	tests := []struct {
@@ -86,41 +128,7 @@ API_URL=https://api.example.com
 				t.Fatalf("Parse() error = %v", err)
 			}
 
-			if len(entries) != len(tt.expected) {
-				t.Fatalf("Parse() returned %d entries, expected %d", len(entries), len(tt.expected))
-			}
-
-			for i, entry := range entries {
-				expected := tt.expected[i]
-
-				switch e := entry.(type) {
-				case KeyValue:
-					exp, ok := expected.(KeyValue)
-					if !ok {
-						t.Errorf("Entry %d is KeyValue, expected %T", i, expected)
-						continue
-					}
-					if e.Key != exp.Key || e.Value != exp.Value || e.Quoted != exp.Quoted || e.Exported != exp.Exported {
-						t.Errorf("KeyValue %d = %+v, expected %+v", i, e, exp)
-					}
-
-				case Comment:
-					exp, ok := expected.(Comment)
-					if !ok {
-						t.Errorf("Entry %d is Comment, expected %T", i, expected)
-						continue
-					}
-					if e.Text != exp.Text {
-						t.Errorf("Comment %d = %v, expected %v", i, e.Text, exp.Text)
-					}
-
-				case BlankLine:
-					_, ok := expected.(BlankLine)
-					if !ok {
-						t.Errorf("Entry %d is BlankLine, expected %T", i, expected)
-					}
-				}
-			}
+			compareEntries(t, entries, tt.expected)
 		})
 	}
 }
@@ -319,41 +327,7 @@ line3"
 				t.Fatalf("Parse() error = %v", err)
 			}
 
-			if len(entries) != len(tt.expected) {
-				t.Fatalf("Parse() returned %d entries, expected %d", len(entries), len(tt.expected))
-			}
-
-			for i, entry := range entries {
-				expected := tt.expected[i]
-
-				switch e := entry.(type) {
-				case KeyValue:
-					exp, ok := expected.(KeyValue)
-					if !ok {
-						t.Errorf("Entry %d is KeyValue, expected %T", i, expected)
-						continue
-					}
-					if e.Key != exp.Key || e.Value != exp.Value || e.Quoted != exp.Quoted || e.Exported != exp.Exported {
-						t.Errorf("KeyValue %d = %+v, expected %+v", i, e, exp)
-					}
-
-				case Comment:
-					exp, ok := expected.(Comment)
-					if !ok {
-						t.Errorf("Entry %d is Comment, expected %T", i, expected)
-						continue
-					}
-					if e.Text != exp.Text {
-						t.Errorf("Comment %d = %v, expected %v", i, e.Text, exp.Text)
-					}
-
-				case BlankLine:
-					_, ok := expected.(BlankLine)
-					if !ok {
-						t.Errorf("Entry %d is BlankLine, expected %T", i, expected)
-					}
-				}
-			}
+			compareEntries(t, entries, tt.expected)
 		})
 	}
 }
@@ -385,9 +359,13 @@ with single quotes'
 }
 
 func TestParseMultilineTestdata(t *testing.T) {
-	file, err := os.Open("../../testdata/.env.multiline")
+	// Get the testdata directory relative to the test file
+	_, filename, _, _ := runtime.Caller(0)
+	testdataPath := filepath.Join(filepath.Dir(filename), "..", "..", "testdata", ".env.multiline")
+
+	file, err := os.Open(testdataPath)
 	if err != nil {
-		t.Skipf("Skipping test: testdata file not found: %v", err)
+		t.Fatalf("Failed to open testdata file: %v", err)
 	}
 	t.Cleanup(func() {
 		if closeErr := file.Close(); closeErr != nil {

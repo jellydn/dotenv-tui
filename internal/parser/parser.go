@@ -27,12 +27,16 @@ type Comment struct {
 // BlankLine represents an empty line
 type BlankLine struct{}
 
+const (
+	initialBufferSize = 1024
+	maxBufferSize     = 1024 * 1024 // 1MB to handle large multiline values
+)
+
 // Parse reads a .env file and returns ordered entries
 func Parse(reader io.Reader) ([]Entry, error) {
 	var entries []Entry
 	scanner := bufio.NewScanner(reader)
-	// Increase buffer to 1MB to handle large values
-	scanner.Buffer(make([]byte, 1024), 1024*1024)
+	scanner.Buffer(make([]byte, initialBufferSize), maxBufferSize)
 
 	var accumulated string
 	var inQuote rune // 0 if not in quote, '"' or '\'' if inside quote
@@ -40,14 +44,18 @@ func Parse(reader io.Reader) ([]Entry, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
+		// Trim trailing carriage return to handle CRLF inputs consistently
+		line = strings.TrimRight(line, "\r")
+
 		// If we're accumulating a multiline value
 		if inQuote != 0 {
 			accumulated += "\n" + line
 			if isMultilineClosed(accumulated, inQuote) {
 				inQuote = 0
-				kv, err := parseKeyValue(accumulated)
+				trimmed := strings.TrimRight(accumulated, " \t\r\n")
+				kv, err := parseKeyValue(trimmed)
 				if err != nil {
-					return nil, fmt.Errorf("error parsing multiline value %q: %w", accumulated, err)
+					return nil, fmt.Errorf("parsing multiline value %q: %w", trimmed, err)
 				}
 				entries = append(entries, kv)
 				accumulated = ""
@@ -81,7 +89,7 @@ func Parse(reader io.Reader) ([]Entry, error) {
 			// Single-line key-value
 			kv, err := parseKeyValue(line)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing line %q: %w", line, err)
+				return nil, fmt.Errorf("parsing line %q: %w", line, err)
 			}
 			entries = append(entries, kv)
 			continue
@@ -96,7 +104,21 @@ func Parse(reader io.Reader) ([]Entry, error) {
 
 	// Check if we ended with an unclosed quote
 	if inQuote != 0 {
-		return nil, fmt.Errorf("unclosed quote in multiline value")
+		// Extract key name for better error context
+		key := "<unknown>"
+		if eq := strings.Index(accumulated, "="); eq != -1 {
+			key = strings.TrimSpace(accumulated[:eq])
+		}
+
+		// Create truncated snippet for error message
+		snippet := accumulated
+		const maxSnippetLen = 80
+		if len(snippet) > maxSnippetLen {
+			snippet = snippet[:maxSnippetLen-3] + "..."
+		}
+
+		return nil, fmt.Errorf("unclosed %q quote in multiline value for key %q starting with %q",
+			string(inQuote), key, snippet)
 	}
 
 	return entries, nil
@@ -119,22 +141,27 @@ func countUnescapedQuotes(s string, quote rune) int {
 	return count
 }
 
-// findUnclosedQuote checks if a line contains an opening quote without a matching closing quote
-// Returns the quote character ('"' or '\”) if unclosed, or 0 if closed or no quotes
-func findUnclosedQuote(line string) rune {
-	// Find the equals sign first
+// extractValuePart returns the portion of the line after the equals sign.
+// Returns empty string if no equals sign is found.
+func extractValuePart(line string) string {
 	eqIdx := strings.IndexByte(line, '=')
 	if eqIdx == -1 {
+		return ""
+	}
+	return line[eqIdx+1:]
+}
+
+// findUnclosedQuote checks if a line contains an opening quote without a matching closing quote.
+// Returns the quote character ('"' or '\”) if unclosed, or 0 if closed or no quotes.
+func findUnclosedQuote(line string) rune {
+	valuePart := extractValuePart(line)
+	if valuePart == "" {
 		return 0
 	}
-
-	// Check the value part (after =)
-	valuePart := line[eqIdx+1:]
 
 	// Check for double quote
 	if strings.HasPrefix(valuePart, "\"") {
 		count := countUnescapedQuotes(valuePart, '"')
-		// If odd number of quotes, it's unclosed
 		if count%2 == 1 {
 			return '"'
 		}
@@ -143,7 +170,6 @@ func findUnclosedQuote(line string) rune {
 	// Check for single quote
 	if strings.HasPrefix(valuePart, "'") {
 		count := countUnescapedQuotes(valuePart, '\'')
-		// If odd number of quotes, it's unclosed
 		if count%2 == 1 {
 			return '\''
 		}
@@ -152,14 +178,10 @@ func findUnclosedQuote(line string) rune {
 	return 0
 }
 
+// isMultilineClosed checks if the accumulated multiline value has a closing quote.
 func isMultilineClosed(accumulated string, quote rune) bool {
-	eqIdx := strings.IndexByte(accumulated, '=')
-	if eqIdx == -1 {
-		return false
-	}
-
-	valuePart := accumulated[eqIdx+1:]
-	if !strings.HasPrefix(valuePart, string(quote)) {
+	valuePart := extractValuePart(accumulated)
+	if valuePart == "" || !strings.HasPrefix(valuePart, string(quote)) {
 		return false
 	}
 
@@ -184,18 +206,18 @@ func parseKeyValue(line string) (KeyValue, error) {
 	kv.Key = strings.TrimSpace(parts[0])
 	value := parts[1]
 
+	// Check if value is quoted
 	if len(value) >= 2 {
-		if (value[0] == '"' && value[len(value)-1] == '"') ||
-			(value[0] == '\'' && value[len(value)-1] == '\'') {
-			kv.Quoted = string(value[0])
+		firstChar, lastChar := value[0], value[len(value)-1]
+		if (firstChar == '"' && lastChar == '"') || (firstChar == '\'' && lastChar == '\'') {
+			kv.Quoted = string(firstChar)
 			kv.Value = value[1 : len(value)-1]
-		} else {
-			kv.Value = value
+			return kv, nil
 		}
-	} else {
-		kv.Value = value
 	}
 
+	// Unquoted value (or too short to be quoted)
+	kv.Value = value
 	return kv, nil
 }
 
