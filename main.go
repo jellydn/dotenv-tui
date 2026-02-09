@@ -115,11 +115,11 @@ func updatePicker(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 			if msg.Mode == tui.GenerateExample {
 				m.currentScreen = previewScreen
 				m.preview.SetWindowHeight(m.windowHeight)
-				return m, tui.NewPreviewModel(msg.Selected)
+				return m, tui.NewPreviewModel(msg.Selected, m.menu.EnableBackup())
 			}
 			if msg.Mode == tui.GenerateEnv {
 				m.currentScreen = formScreen
-				return m, tui.NewFormModel(msg.Selected[0], 0, len(msg.Selected), m.savedFiles)
+				return m, tui.NewFormModel(msg.Selected[0], 0, len(msg.Selected), m.savedFiles, m.menu.EnableBackup())
 			}
 		}
 		m.currentScreen = menuScreen
@@ -179,7 +179,7 @@ func updateForm(msg tea.Msg, m model) (tea.Model, tea.Cmd) {
 
 		m.fileIndex = nextIndex
 		m.currentScreen = formScreen
-		return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, n, m.savedFiles)
+		return m, tui.NewFormModel(m.fileList[m.fileIndex], m.fileIndex, n, m.savedFiles, m.menu.EnableBackup())
 	}
 
 	return m, formCmd
@@ -215,6 +215,7 @@ func main() {
 		scanFlag        = flag.Bool("scan", false, "Scan directory for .env files")
 		yoloFlag        = flag.Bool("yolo", false, "Auto-generate .env from all .env.example files")
 		forceFlag       = flag.Bool("force", false, "Force overwrite existing files")
+		noBackupFlag    = flag.Bool("no-backup", false, "Skip creating backup files")
 		upgradeFlag     = flag.Bool("upgrade", false, "Upgrade to the latest version")
 	)
 
@@ -231,7 +232,7 @@ func main() {
 	}
 
 	if *generateExample != "" {
-		if err := cli.GenerateExampleFile(*generateExample, *forceFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
+		if err := cli.GenerateExampleFile(*generateExample, *forceFlag, !*noBackupFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating .env.example: %v\n", err)
 			os.Exit(1)
 		}
@@ -239,7 +240,7 @@ func main() {
 	}
 
 	if *generateEnv != "" {
-		if err := cli.GenerateEnvFile(*generateEnv, *forceFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
+		if err := cli.GenerateEnvFile(*generateEnv, *forceFlag, !*noBackupFlag, cli.RealFileSystem{}, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating .env: %v\n", err)
 			os.Exit(1)
 		}
@@ -260,7 +261,7 @@ func main() {
 	}
 
 	if *yoloFlag {
-		if err := cli.GenerateAllEnvFiles(*forceFlag, cli.RealFileSystem{}, cli.RealDirScanner{}, os.Stdin, os.Stdout); err != nil {
+		if err := cli.GenerateAllEnvFiles(*forceFlag, !*noBackupFlag, cli.RealFileSystem{}, cli.RealDirScanner{}, os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -294,6 +295,7 @@ FLAGS:
     --scan [directory]           List discovered .env files (default: current directory)
     --yolo                       Auto-generate .env from all .env.example files
     --force                      Force overwrite existing files
+    --no-backup                  Skip creating backup files when overwriting
     --upgrade                    Upgrade to the latest version
     --version                    Show version information
     --help                       Show this help message
@@ -306,6 +308,7 @@ EXAMPLES:
     dotenv-tui --scan ./myproject                 # Scan specific directory
     dotenv-tui --yolo                             # Auto-generate .env from all .env.example files
     dotenv-tui --yolo --force                     # Force overwrite existing .env files
+    dotenv-tui --yolo --force --no-backup         # Overwrite without backups (CI/CD use)
     dotenv-tui --upgrade                          # Upgrade to the latest version
  `)
 }

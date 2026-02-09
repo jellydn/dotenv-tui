@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jellydn/dotenv-tui/internal/backup"
 	"github.com/jellydn/dotenv-tui/internal/generator"
 	"github.com/jellydn/dotenv-tui/internal/parser"
 	"github.com/jellydn/dotenv-tui/internal/scanner"
@@ -22,6 +23,7 @@ type FileSystem interface {
 	Open(name string) (io.ReadCloser, error)
 	Stat(name string) (os.FileInfo, error)
 	Create(name string) (io.WriteCloser, error)
+	CreateWithMode(name string, mode os.FileMode) (io.WriteCloser, error)
 }
 
 // DirScanner defines directory scanning operations for testing.
@@ -48,6 +50,11 @@ func (RealFileSystem) Create(name string) (io.WriteCloser, error) {
 	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 }
 
+// CreateWithMode implements FileSystem.CreateWithMode.
+func (RealFileSystem) CreateWithMode(name string, mode os.FileMode) (io.WriteCloser, error) {
+	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+}
+
 // RealDirScanner is the default scanner implementation using the scanner package.
 type RealDirScanner struct{}
 
@@ -62,7 +69,7 @@ func (RealDirScanner) ScanExamples(root string) ([]string, error) {
 }
 
 // GenerateFile generates a file from an input file, processing entries with the provided function.
-func GenerateFile(inputPath string, force bool, outputFilename string, processEntries EntryProcessor, parseErrMsg string, fs FileSystem, out io.Writer) error {
+func GenerateFile(inputPath string, force bool, createBackup bool, outputFilename string, processEntries EntryProcessor, parseErrMsg string, fs FileSystem, out io.Writer) error {
 	file, err := fs.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to open input file: %w", err)
@@ -80,6 +87,26 @@ func GenerateFile(inputPath string, force bool, outputFilename string, processEn
 
 	if _, err := fs.Stat(outputPath); err == nil && !force {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
+	}
+
+	if createBackup {
+		if outputPath == inputPath {
+			backupPath, err := backup.CreateBackupWithFS(inputPath, fsAdapter{fs})
+			if err != nil {
+				return fmt.Errorf("failed to create backup: %w", err)
+			}
+			if backupPath != "" {
+				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
+			}
+		} else {
+			backupPath, err := backup.CreateBackupWithFS(outputPath, fsAdapter{fs})
+			if err != nil {
+				return fmt.Errorf("failed to create backup: %w", err)
+			}
+			if backupPath != "" {
+				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
+			}
+		}
 	}
 
 	outFile, err := fs.Create(outputPath)
@@ -101,13 +128,13 @@ func GenerateFile(inputPath string, force bool, outputFilename string, processEn
 }
 
 // GenerateExampleFile generates a .env.example file from a .env file.
-func GenerateExampleFile(inputPath string, force bool, fs FileSystem, out io.Writer) error {
-	return GenerateFile(inputPath, force, ".env.example", generator.GenerateExample, ".env file", fs, out)
+func GenerateExampleFile(inputPath string, force bool, createBackup bool, fs FileSystem, out io.Writer) error {
+	return GenerateFile(inputPath, force, createBackup, ".env.example", generator.GenerateExample, ".env file", fs, out)
 }
 
 // GenerateEnvFile generates a .env file from a .env.example file.
-func GenerateEnvFile(inputPath string, force bool, fs FileSystem, out io.Writer) error {
-	return GenerateFile(inputPath, force, ".env", func(entries []parser.Entry) []parser.Entry {
+func GenerateEnvFile(inputPath string, force bool, createBackup bool, fs FileSystem, out io.Writer) error {
+	return GenerateFile(inputPath, force, createBackup, ".env", func(entries []parser.Entry) []parser.Entry {
 		return entries
 	}, ".env.example file", fs, out)
 }
@@ -137,7 +164,7 @@ func ScanAndList(dir string, sc DirScanner, out io.Writer) error {
 }
 
 // GenerateAllEnvFiles generates .env files from all .env.example files.
-func GenerateAllEnvFiles(force bool, fs FileSystem, sc DirScanner, in io.Reader, out io.Writer) error {
+func GenerateAllEnvFiles(force bool, createBackup bool, fs FileSystem, sc DirScanner, in io.Reader, out io.Writer) error {
 	exampleFiles, err := sc.ScanExamples(".")
 	if err != nil {
 		return fmt.Errorf("failed to scan for .env.example files: %w", err)
@@ -154,7 +181,7 @@ func GenerateAllEnvFiles(force bool, fs FileSystem, sc DirScanner, in io.Reader,
 
 	var generated, skipped int
 	for _, exampleFile := range exampleFiles {
-		if err := ProcessExampleFile(exampleFile, force, &generated, &skipped, fs, in, out); err != nil {
+		if err := ProcessExampleFile(exampleFile, force, createBackup, &generated, &skipped, fs, in, out); err != nil {
 			return err
 		}
 	}
@@ -164,7 +191,7 @@ func GenerateAllEnvFiles(force bool, fs FileSystem, sc DirScanner, in io.Reader,
 }
 
 // ProcessExampleFile processes a single .env.example file and generates a .env file.
-func ProcessExampleFile(exampleFile string, force bool, generated, skipped *int, fs FileSystem, in io.Reader, out io.Writer) error {
+func ProcessExampleFile(exampleFile string, force bool, createBackup bool, generated, skipped *int, fs FileSystem, in io.Reader, out io.Writer) error {
 	outputPath := strings.TrimSuffix(exampleFile, ".example")
 
 	entries, err := parseAndClose(exampleFile, fs)
@@ -181,6 +208,17 @@ func ProcessExampleFile(exampleFile string, force bool, generated, skipped *int,
 			_, _ = fmt.Fprintf(out, "Skipped %s\n", outputPath)
 			*skipped++
 			return nil
+		}
+	}
+
+	// Create backup if file exists and backups are enabled
+	if createBackup {
+		backupPath, err := backup.CreateBackupWithFS(outputPath, fsAdapter{fs})
+		if err != nil {
+			return fmt.Errorf("failed to create backup: %w", err)
+		}
+		if backupPath != "" {
+			_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
 		}
 	}
 
@@ -240,4 +278,21 @@ func writeEntries(path string, fs FileSystem, entries []parser.Entry) error {
 	}
 
 	return nil
+}
+
+// fsAdapter adapts cli.FileSystem to backup.FileSystem.
+type fsAdapter struct {
+	FileSystem
+}
+
+func (a fsAdapter) Stat(name string) (os.FileInfo, error) {
+	return a.FileSystem.Stat(name)
+}
+
+func (a fsAdapter) Open(name string) (io.ReadCloser, error) {
+	return a.FileSystem.Open(name)
+}
+
+func (a fsAdapter) CreateWithMode(name string, mode os.FileMode) (io.WriteCloser, error) {
+	return a.FileSystem.CreateWithMode(name, mode)
 }

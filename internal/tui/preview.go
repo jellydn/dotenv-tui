@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jellydn/dotenv-tui/internal/backup"
 	"github.com/jellydn/dotenv-tui/internal/generator"
 	"github.com/jellydn/dotenv-tui/internal/parser"
 
@@ -31,6 +32,7 @@ type PreviewModel struct {
 	written      bool
 	writeResults []writeResult
 	windowHeight int
+	enableBackup bool
 }
 
 type writeResult struct {
@@ -45,17 +47,18 @@ type PreviewFinishedMsg struct {
 }
 
 type previewInitMsg struct {
-	files []filePreview
+	files        []filePreview
+	enableBackup bool
 }
 
 // NewPreviewModel creates a preview for multiple files at once.
-func NewPreviewModel(filePaths []string) tea.Cmd {
+func NewPreviewModel(filePaths []string, enableBackup bool) tea.Cmd {
 	return func() tea.Msg {
 		var files []filePreview
 		for _, fp := range filePaths {
 			files = append(files, loadFilePreview(fp))
 		}
-		return previewInitMsg{files: files}
+		return previewInitMsg{files: files, enableBackup: enableBackup}
 	}
 }
 
@@ -155,6 +158,7 @@ func (m PreviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scrollOffset = 0
 		m.written = false
 		m.writeResults = nil
+		m.enableBackup = msg.enableBackup
 		return m, nil
 
 	case tea.WindowSizeMsg:
@@ -219,7 +223,7 @@ func (m PreviewModel) writeAllFiles() []writeResult {
 			})
 			continue
 		}
-		err := writePreviewFile(f.outputPath, f.generatedEntries)
+		err := m.writePreviewFile(f.outputPath, f.generatedEntries)
 		if err != nil {
 			results = append(results, writeResult{
 				OutputPath: f.outputPath,
@@ -236,7 +240,15 @@ func (m PreviewModel) writeAllFiles() []writeResult {
 	return results
 }
 
-func writePreviewFile(outputPath string, entries []parser.Entry) error {
+func (m PreviewModel) writePreviewFile(outputPath string, entries []parser.Entry) error {
+	if m.enableBackup {
+		if _, err := os.Stat(outputPath); err == nil {
+			if _, err := backup.CreateBackup(outputPath); err != nil {
+				return fmt.Errorf("failed to create backup: %w", err)
+			}
+		}
+	}
+
 	file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
