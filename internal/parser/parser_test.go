@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -371,4 +372,55 @@ with single quotes'
 	if builder.String() != input {
 		t.Errorf("Round trip failed:\nGot:\n%s\nExpected:\n%s", builder.String(), input)
 	}
+}
+
+func TestParseMultilineTestdata(t *testing.T) {
+file, err := os.Open("../../testdata/.env.multiline")
+if err != nil {
+t.Skipf("Skipping test: testdata file not found: %v", err)
+}
+defer file.Close()
+
+entries, err := Parse(file)
+if err != nil {
+t.Fatalf("Parse() error = %v", err)
+}
+
+// Count entries by type
+var kvCount, commentCount, blankCount int
+for _, entry := range entries {
+switch entry.(type) {
+case KeyValue:
+kvCount++
+case Comment:
+commentCount++
+case BlankLine:
+blankCount++
+}
+}
+
+t.Logf("Parsed .env.multiline: %d key-values, %d comments, %d blank lines",
+kvCount, commentCount, blankCount)
+
+// Verify we have expected counts (at least)
+if kvCount < 9 {
+t.Errorf("Expected at least 9 key-value entries, got %d", kvCount)
+}
+
+// Test round-trip
+var builder strings.Builder
+err = Write(&builder, entries)
+if err != nil {
+t.Fatalf("Write() error = %v", err)
+}
+
+// Parse the written output again
+reEntries, err := Parse(strings.NewReader(builder.String()))
+if err != nil {
+t.Fatalf("Parse() of written output error = %v", err)
+}
+
+if len(reEntries) != len(entries) {
+t.Errorf("Round-trip changed number of entries: %d -> %d", len(entries), len(reEntries))
+}
 }
