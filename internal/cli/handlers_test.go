@@ -50,6 +50,10 @@ func (m *mockFileSystem) Stat(name string) (os.FileInfo, error) {
 }
 
 func (m *mockFileSystem) Create(name string) (io.WriteCloser, error) {
+	return m.CreateWithMode(name, 0600)
+}
+
+func (m *mockFileSystem) CreateWithMode(name string, mode os.FileMode) (io.WriteCloser, error) {
 	if m.createError != nil {
 		return nil, m.createError
 	}

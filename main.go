@@ -43,7 +43,6 @@ type model struct {
 	pickerMode    tui.MenuChoice
 	windowHeight  int
 	savedFiles    map[int]bool
-	enableBackup  bool
 }
 
 type screen int
@@ -59,7 +58,6 @@ func initialModel() model {
 	return model{
 		currentScreen: menuScreen,
 		menu:          tui.NewMenuModel(),
-		enableBackup:  true,
 	}
 }
 

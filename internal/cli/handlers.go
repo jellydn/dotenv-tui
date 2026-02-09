@@ -23,6 +23,7 @@ type FileSystem interface {
 	Open(name string) (io.ReadCloser, error)
 	Stat(name string) (os.FileInfo, error)
 	Create(name string) (io.WriteCloser, error)
+	CreateWithMode(name string, mode os.FileMode) (io.WriteCloser, error)
 }
 
 // DirScanner defines directory scanning operations for testing.
@@ -47,6 +48,11 @@ func (RealFileSystem) Stat(name string) (os.FileInfo, error) {
 // Create implements FileSystem.Create.
 func (RealFileSystem) Create(name string) (io.WriteCloser, error) {
 	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+}
+
+// CreateWithMode implements FileSystem.CreateWithMode.
+func (RealFileSystem) CreateWithMode(name string, mode os.FileMode) (io.WriteCloser, error) {
+	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
 }
 
 // RealDirScanner is the default scanner implementation using the scanner package.
@@ -85,7 +91,7 @@ func GenerateFile(inputPath string, force bool, createBackup bool, outputFilenam
 
 	if createBackup {
 		if outputPath == inputPath {
-			backupPath, err := backup.CreateBackupWithFS(inputPath, fs)
+			backupPath, err := backup.CreateBackupWithFS(inputPath, fsAdapter{fs})
 			if err != nil {
 				return fmt.Errorf("failed to create backup: %w", err)
 			}
@@ -93,7 +99,7 @@ func GenerateFile(inputPath string, force bool, createBackup bool, outputFilenam
 				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
 			}
 		} else {
-			backupPath, err := backup.CreateBackupWithFS(outputPath, fs)
+			backupPath, err := backup.CreateBackupWithFS(outputPath, fsAdapter{fs})
 			if err != nil {
 				return fmt.Errorf("failed to create backup: %w", err)
 			}
@@ -207,7 +213,7 @@ func ProcessExampleFile(exampleFile string, force bool, createBackup bool, gener
 
 	// Create backup if file exists and backups are enabled
 	if createBackup {
-		backupPath, err := backup.CreateBackupWithFS(outputPath, fs)
+		backupPath, err := backup.CreateBackupWithFS(outputPath, fsAdapter{fs})
 		if err != nil {
 			return fmt.Errorf("failed to create backup: %w", err)
 		}
@@ -272,4 +278,21 @@ func writeEntries(path string, fs FileSystem, entries []parser.Entry) error {
 	}
 
 	return nil
+}
+
+// fsAdapter adapts cli.FileSystem to backup.FileSystem.
+type fsAdapter struct {
+	FileSystem
+}
+
+func (a fsAdapter) Stat(name string) (os.FileInfo, error) {
+	return a.FileSystem.Stat(name)
+}
+
+func (a fsAdapter) Open(name string) (io.ReadCloser, error) {
+	return a.FileSystem.Open(name)
+}
+
+func (a fsAdapter) CreateWithMode(name string, mode os.FileMode) (io.WriteCloser, error) {
+	return a.FileSystem.CreateWithMode(name, mode)
 }
