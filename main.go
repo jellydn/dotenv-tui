@@ -297,6 +297,7 @@ FLAGS:
     --yolo                       Auto-generate .env from all .env.example files
     --force                      Force overwrite existing files
     --no-backup                  Skip creating backup files when overwriting
+    --dry-run                    Preview operations without writing files
     --upgrade                    Upgrade to the latest version
     --version                    Show version information
     --help                       Show this help message
@@ -310,6 +311,8 @@ EXAMPLES:
     dotenv-tui --yolo                             # Auto-generate .env from all .env.example files
     dotenv-tui --yolo --force                     # Force overwrite existing .env files
     dotenv-tui --yolo --force --no-backup         # Overwrite without backups (CI/CD use)
+    dotenv-tui --generate-example .env --dry-run  # Preview .env.example generation
+    dotenv-tui --yolo --dry-run                   # Preview all files that would be generated
     dotenv-tui --upgrade                          # Upgrade to the latest version
  `)
 }
