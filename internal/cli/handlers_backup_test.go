@@ -49,7 +49,7 @@ func TestGenerateExampleFileWithBackup(t *testing.T) {
 			}
 
 			var out bytes.Buffer
-			err := GenerateExampleFile("/test/.env", tt.force, tt.createBackup, fs, &out)
+			err := GenerateExampleFile("/test/.env", tt.force, tt.createBackup, false, fs, &out)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -121,7 +121,7 @@ func TestGenerateEnvFileWithBackup(t *testing.T) {
 			}
 
 			var out bytes.Buffer
-			err := GenerateEnvFile("/test/.env.example", tt.force, tt.createBackup, fs, &out)
+			err := GenerateEnvFile("/test/.env.example", tt.force, tt.createBackup, false, fs, &out)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
