@@ -43,6 +43,7 @@ go test -v -run TestFunctionName ./package/path
 # Examples
 go test -v -run TestParse ./internal/parser
 go test -v -run TestIsSecret ./internal/detector
+go test -v -run TestCreateBackup ./internal/backup
 
 # Run tests for a specific package
 go test -v ./internal/parser
@@ -50,6 +51,9 @@ go test -v ./internal/detector
 go test -v ./internal/generator
 go test -v ./internal/scanner
 go test -v ./internal/tui
+go test -v ./internal/cli
+go test -v ./internal/backup
+go test -v ./internal/upgrade
 
 # Run with race detection and coverage
 go test -v -race -coverprofile=coverage.out ./...
@@ -143,11 +147,14 @@ type Entry interface{}
 ├── justfile             # Task definitions
 ├── go.mod/go.sum        # Go module files
 ├── internal/            # Internal packages
-│   ├── parser/          # .env file parser
+│   ├── backup/          # Backup file creation
+│   ├── cli/             # CLI handlers
 │   ├── detector/        # Secret detection logic
 │   ├── generator/       # .env.example generation
+│   ├── parser/          # .env file parser
 │   ├── scanner/         # Directory scanning
-│   └── tui/             # Bubble Tea TUI components
+│   ├── tui/             # Bubble Tea TUI components
+│   └── upgrade/         # Self-upgrade functionality
 └── testdata/            # Test fixtures
 ```
 
