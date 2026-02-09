@@ -416,3 +416,228 @@ func TestParseMultilineTestdata(t *testing.T) {
 		t.Errorf("Round-trip changed number of entries: %d -> %d", len(entries), len(reEntries))
 	}
 }
+
+func TestParseMultilineErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "unclosed double quote",
+			input: "KEY=\"line1\nline2\n",
+			want:  "unclosed",
+		},
+		{
+			name:  "unclosed single quote",
+			input: "KEY='line1\nline2\n",
+			want:  "unclosed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse(strings.NewReader(tt.input))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error %q should contain %q", err.Error(), tt.want)
+			}
+		})
+	}
+}
+
+func TestParseMultilineEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []Entry
+	}{
+		{
+			name:  "empty double-quoted value",
+			input: "KEY=\"\"\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "", Quoted: "\""},
+			},
+		},
+		{
+			name:  "empty single-quoted value",
+			input: "KEY=''\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "", Quoted: "'"},
+			},
+		},
+		{
+			name:  "value with hash inside double quotes",
+			input: "KEY=\"value # not a comment\"\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "value # not a comment", Quoted: "\""},
+			},
+		},
+		{
+			name:  "multiple multiline values back-to-back",
+			input: "A=\"one\ntwo\"\nB='three\nfour'\n",
+			expected: []Entry{
+				KeyValue{Key: "A", Value: "one\ntwo", Quoted: "\""},
+				KeyValue{Key: "B", Value: "three\nfour", Quoted: "'"},
+			},
+		},
+		{
+			name:  "multiline value at EOF without trailing newline",
+			input: "KEY=\"line1\nline2\"",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "line1\nline2", Quoted: "\""},
+			},
+		},
+		{
+			name:  "CRLF line endings in multiline",
+			input: "KEY=\"line1\r\nline2\r\nline3\"\r\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "line1\nline2\nline3", Quoted: "\""},
+			},
+		},
+		{
+			name:  "whitespace-only value in quotes",
+			input: "KEY=\"   \"\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "   ", Quoted: "\""},
+			},
+		},
+		{
+			name:  "multiline with tabs and spaces",
+			input: "KEY=\"line1\n\tindented\n  spaced\"\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "line1\n\tindented\n  spaced", Quoted: "\""},
+			},
+		},
+		{
+			name:  "value with only newline in quotes",
+			input: "KEY=\"\n\"\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "\n", Quoted: "\""},
+			},
+		},
+		{
+			name:  "single char value",
+			input: "KEY=x\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: "x"},
+			},
+		},
+		{
+			name:  "empty value",
+			input: "KEY=\n",
+			expected: []Entry{
+				KeyValue{Key: "KEY", Value: ""},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entries, err := Parse(strings.NewReader(tt.input))
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+			compareEntries(t, entries, tt.expected)
+		})
+	}
+}
+
+func TestCountUnescapedQuotes(t *testing.T) {
+	tests := []struct {
+		name  string
+		s     string
+		quote rune
+		want  int
+	}{
+		{"no quotes", "hello world", '"', 0},
+		{"one double quote", `"hello`, '"', 1},
+		{"two double quotes", `"hello"`, '"', 2},
+		{"escaped quote", `\"hello\"`, '"', 0},
+		{"mixed escaped and unescaped", `"hello \"world\""`, '"', 2},
+		{"single quotes counted", `'hello'`, '\'', 2},
+		{"double backslash before quote", `\\"`, '"', 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := countUnescapedQuotes(tt.s, tt.quote)
+			if got != tt.want {
+				t.Errorf("countUnescapedQuotes(%q, %q) = %d, want %d", tt.s, string(tt.quote), got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFindUnclosedQuote(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		want rune
+	}{
+		{"closed double quotes", `KEY="value"`, 0},
+		{"closed single quotes", `KEY='value'`, 0},
+		{"unclosed double quote", `KEY="value`, '"'},
+		{"unclosed single quote", `KEY='value`, '\''},
+		{"no quotes", `KEY=value`, 0},
+		{"no equals sign", `NOVALUE`, 0},
+		{"empty value", `KEY=`, 0},
+		{"escaped quote still counts as unclosed", `KEY="val\"`, '"'},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := findUnclosedQuote(tt.line)
+			if got != tt.want {
+				t.Errorf("findUnclosedQuote(%q) = %q, want %q", tt.line, string(got), string(tt.want))
+			}
+		})
+	}
+}
+
+func TestExtractValuePart(t *testing.T) {
+	tests := []struct {
+		line string
+		want string
+	}{
+		{`KEY=value`, "value"},
+		{`KEY="quoted"`, `"quoted"`},
+		{`KEY=`, ""},
+		{`NOEQUALS`, ""},
+		{`KEY=a=b=c`, "a=b=c"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.line, func(t *testing.T) {
+			got := extractValuePart(tt.line)
+			if got != tt.want {
+				t.Errorf("extractValuePart(%q) = %q, want %q", tt.line, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEntryToString(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry Entry
+		want  string
+	}{
+		{"key-value unquoted", KeyValue{Key: "K", Value: "v"}, "K=v"},
+		{"key-value double quoted", KeyValue{Key: "K", Value: "v", Quoted: "\""}, `K="v"`},
+		{"key-value exported", KeyValue{Key: "K", Value: "v", Exported: true}, "export K=v"},
+		{"comment", Comment{Text: "# hello"}, "# hello"},
+		{"blank line", BlankLine{}, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := EntryToString(tt.entry)
+			if got != tt.want {
+				t.Errorf("EntryToString() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
