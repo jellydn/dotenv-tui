@@ -85,7 +85,6 @@ func GenerateFile(inputPath string, force bool, createBackup bool, dryRun bool, 
 
 	outputPath := filepath.Join(filepath.Dir(inputPath), outputFilename)
 
-	// Error if file exists without --force flag (unless in dry-run mode)
 	if _, err := fs.Stat(outputPath); err == nil && !force && !dryRun {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
 	}
@@ -96,22 +95,12 @@ func GenerateFile(inputPath string, force bool, createBackup bool, dryRun bool, 
 	}
 
 	if createBackup {
-		if outputPath == inputPath {
-			backupPath, err := backup.CreateBackupWithFS(inputPath, fsAdapter{fs})
-			if err != nil {
-				return fmt.Errorf("failed to create backup: %w", err)
-			}
-			if backupPath != "" {
-				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
-			}
-		} else {
-			backupPath, err := backup.CreateBackupWithFS(outputPath, fsAdapter{fs})
-			if err != nil {
-				return fmt.Errorf("failed to create backup: %w", err)
-			}
-			if backupPath != "" {
-				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
-			}
+		backupPath, err := backup.CreateBackupWithFS(outputPath, fsAdapter{fs})
+		if err != nil {
+			return fmt.Errorf("failed to create backup: %w", err)
+		}
+		if backupPath != "" {
+			_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
 		}
 	}
 
@@ -185,7 +174,6 @@ func GenerateAllEnvFiles(force bool, createBackup bool, dryRun bool, fs FileSyst
 		_, _ = fmt.Fprintf(out, "  %s\n", file)
 	}
 
-	// Dry-run mode: preview all files that would be generated
 	if dryRun {
 		_, _ = fmt.Fprintln(out, "\n[DRY RUN MODE - No files will be written]")
 		for _, exampleFile := range exampleFiles {
@@ -302,15 +290,10 @@ func writeEntries(path string, fs FileSystem, entries []parser.Entry) error {
 	return nil
 }
 
-// previewOutput displays what would be written without actually writing the file.
 func previewOutput(outputPath string, entries []parser.Entry, fs FileSystem, out io.Writer) error {
-	// Check if file exists
-	fileExists := false
-	if _, err := fs.Stat(outputPath); err == nil {
-		fileExists = true
-	}
+	_, existsErr := fs.Stat(outputPath)
+	fileExists := existsErr == nil
 
-	// Print header
 	_, _ = fmt.Fprintln(out, "")
 	_, _ = fmt.Fprintln(out, "=== DRY RUN PREVIEW ===")
 	_, _ = fmt.Fprintf(out, "File: %s\n", outputPath)
@@ -323,13 +306,11 @@ func previewOutput(outputPath string, entries []parser.Entry, fs FileSystem, out
 	_, _ = fmt.Fprintln(out, "Content preview:")
 	_, _ = fmt.Fprintln(out, "---")
 
-	// Write entries to a buffer to preview
 	var buf strings.Builder
-	if err := parser.Write(&nopWriteCloser{Writer: &buf}, entries); err != nil {
+	if err := parser.Write(&nopWriteCloser{&buf}, entries); err != nil {
 		return fmt.Errorf("failed to generate preview: %w", err)
 	}
 
-	// Print the content
 	_, _ = fmt.Fprint(out, buf.String())
 	_, _ = fmt.Fprintln(out, "---")
 	_, _ = fmt.Fprintln(out, "")
@@ -337,14 +318,9 @@ func previewOutput(outputPath string, entries []parser.Entry, fs FileSystem, out
 	return nil
 }
 
-// nopWriteCloser wraps an io.Writer and adds a no-op Close method.
-type nopWriteCloser struct {
-	io.Writer
-}
+type nopWriteCloser struct{ io.Writer }
 
-func (nopWriteCloser) Close() error {
-	return nil
-}
+func (nopWriteCloser) Close() error { return nil }
 
 // fsAdapter adapts cli.FileSystem to backup.FileSystem.
 type fsAdapter struct {
