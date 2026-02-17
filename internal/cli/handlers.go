@@ -69,7 +69,7 @@ func (RealDirScanner) ScanExamples(root string) ([]string, error) {
 }
 
 // GenerateFile generates a file from an input file, processing entries with the provided function.
-func GenerateFile(inputPath string, force bool, createBackup bool, outputFilename string, processEntries EntryProcessor, parseErrMsg string, fs FileSystem, out io.Writer) error {
+func GenerateFile(inputPath string, force bool, createBackup bool, dryRun bool, outputFilename string, processEntries EntryProcessor, parseErrMsg string, fs FileSystem, out io.Writer) error {
 	file, err := fs.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to open input file: %w", err)
@@ -85,27 +85,22 @@ func GenerateFile(inputPath string, force bool, createBackup bool, outputFilenam
 
 	outputPath := filepath.Join(filepath.Dir(inputPath), outputFilename)
 
-	if _, err := fs.Stat(outputPath); err == nil && !force {
+	if _, err := fs.Stat(outputPath); err == nil && !force && !dryRun {
 		return fmt.Errorf("%s already exists. Use --force to overwrite", outputPath)
 	}
 
+	// Dry-run mode: preview the output without writing
+	if dryRun {
+		return previewOutput(outputPath, processedEntries, fs, out)
+	}
+
 	if createBackup {
-		if outputPath == inputPath {
-			backupPath, err := backup.CreateBackupWithFS(inputPath, fsAdapter{fs})
-			if err != nil {
-				return fmt.Errorf("failed to create backup: %w", err)
-			}
-			if backupPath != "" {
-				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
-			}
-		} else {
-			backupPath, err := backup.CreateBackupWithFS(outputPath, fsAdapter{fs})
-			if err != nil {
-				return fmt.Errorf("failed to create backup: %w", err)
-			}
-			if backupPath != "" {
-				_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
-			}
+		backupPath, err := backup.CreateBackupWithFS(outputPath, fsAdapter{fs})
+		if err != nil {
+			return fmt.Errorf("failed to create backup: %w", err)
+		}
+		if backupPath != "" {
+			_, _ = fmt.Fprintf(out, "Backup created: %s\n", backupPath)
 		}
 	}
 
@@ -128,13 +123,13 @@ func GenerateFile(inputPath string, force bool, createBackup bool, outputFilenam
 }
 
 // GenerateExampleFile generates a .env.example file from a .env file.
-func GenerateExampleFile(inputPath string, force bool, createBackup bool, fs FileSystem, out io.Writer) error {
-	return GenerateFile(inputPath, force, createBackup, ".env.example", generator.GenerateExample, ".env file", fs, out)
+func GenerateExampleFile(inputPath string, force bool, createBackup bool, dryRun bool, fs FileSystem, out io.Writer) error {
+	return GenerateFile(inputPath, force, createBackup, dryRun, ".env.example", generator.GenerateExample, ".env file", fs, out)
 }
 
 // GenerateEnvFile generates a .env file from a .env.example file.
-func GenerateEnvFile(inputPath string, force bool, createBackup bool, fs FileSystem, out io.Writer) error {
-	return GenerateFile(inputPath, force, createBackup, ".env", func(entries []parser.Entry) []parser.Entry {
+func GenerateEnvFile(inputPath string, force bool, createBackup bool, dryRun bool, fs FileSystem, out io.Writer) error {
+	return GenerateFile(inputPath, force, createBackup, dryRun, ".env", func(entries []parser.Entry) []parser.Entry {
 		return entries
 	}, ".env.example file", fs, out)
 }
@@ -164,7 +159,7 @@ func ScanAndList(dir string, sc DirScanner, out io.Writer) error {
 }
 
 // GenerateAllEnvFiles generates .env files from all .env.example files.
-func GenerateAllEnvFiles(force bool, createBackup bool, fs FileSystem, sc DirScanner, in io.Reader, out io.Writer) error {
+func GenerateAllEnvFiles(force bool, createBackup bool, dryRun bool, fs FileSystem, sc DirScanner, in io.Reader, out io.Writer) error {
 	exampleFiles, err := sc.ScanExamples(".")
 	if err != nil {
 		return fmt.Errorf("failed to scan for .env.example files: %w", err)
@@ -177,6 +172,21 @@ func GenerateAllEnvFiles(force bool, createBackup bool, fs FileSystem, sc DirSca
 	_, _ = fmt.Fprintf(out, "Found %d .env.example file(s):\n", len(exampleFiles))
 	for _, file := range exampleFiles {
 		_, _ = fmt.Fprintf(out, "  %s\n", file)
+	}
+
+	if dryRun {
+		_, _ = fmt.Fprintln(out, "\n[DRY RUN MODE - No files will be written]")
+		for _, exampleFile := range exampleFiles {
+			outputPath := strings.TrimSuffix(exampleFile, ".example")
+			entries, err := parseAndClose(exampleFile, fs)
+			if err != nil {
+				return err
+			}
+			if err := previewOutput(outputPath, entries, fs, out); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	var generated, skipped int
@@ -279,6 +289,38 @@ func writeEntries(path string, fs FileSystem, entries []parser.Entry) error {
 
 	return nil
 }
+
+func previewOutput(outputPath string, entries []parser.Entry, fs FileSystem, out io.Writer) error {
+	_, existsErr := fs.Stat(outputPath)
+	fileExists := existsErr == nil
+
+	_, _ = fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "=== DRY RUN PREVIEW ===")
+	_, _ = fmt.Fprintf(out, "File: %s\n", outputPath)
+	if fileExists {
+		_, _ = fmt.Fprintln(out, "Status: Would OVERWRITE existing file")
+	} else {
+		_, _ = fmt.Fprintln(out, "Status: Would CREATE new file")
+	}
+	_, _ = fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "Content preview:")
+	_, _ = fmt.Fprintln(out, "---")
+
+	var buf strings.Builder
+	if err := parser.Write(&nopWriteCloser{&buf}, entries); err != nil {
+		return fmt.Errorf("failed to generate preview: %w", err)
+	}
+
+	_, _ = fmt.Fprint(out, buf.String())
+	_, _ = fmt.Fprintln(out, "---")
+	_, _ = fmt.Fprintln(out, "")
+
+	return nil
+}
+
+type nopWriteCloser struct{ io.Writer }
+
+func (nopWriteCloser) Close() error { return nil }
 
 // fsAdapter adapts cli.FileSystem to backup.FileSystem.
 type fsAdapter struct {
